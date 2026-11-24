@@ -10,6 +10,11 @@ on:
         description: "Optional versionName override (e.g. 1.2.0)"
         required: false
         default: ""
+      upload_artifact:
+        description: "Also upload as GitHub Actions artifact (uses artifact storage quota)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build:
@@ -51,19 +56,12 @@ jobs:
             echo "Restoring debug.keystore from DEBUG_KEYSTORE_BASE64 secret..."
             echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > debug.keystore
           else
-            echo "::warning::debug.keystore.base64 not found in repository root or secrets; generating CI debug.keystore fallback."
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            echo "Restoring permanent project debug.keystore..."
+            printf '%s' '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' | base64 -d > debug.keystore
           fi
           mkdir -p ~/.android
           cp debug.keystore ~/.android/debug.keystore
+          keytool -list -keystore debug.keystore -storepass android -alias androiddebugkey | grep -E "Alias|SHA1|SHA256" || true
 
       - name: Setup Environment Variables
         run: |
@@ -103,21 +101,49 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Prepare APK Asset
+      - name: Align, Sign & Verify APK Asset
+        id: package_apk
         run: |
           mkdir -p release-assets
           APK_FILE=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          VERSIONED_NAME="PCViewPort_v${{ steps.version.outputs.version_name }}.apk"
-          if [ -n "$APK_FILE" ]; then
-            cp "$APK_FILE" "release-assets/${VERSIONED_NAME}"
-            echo "apk_path=release-assets/${VERSIONED_NAME}" >> "$GITHUB_OUTPUT"
-            echo "apk_name=${VERSIONED_NAME}" >> "$GITHUB_OUTPUT"
-            echo "Prepared ${VERSIONED_NAME} from ${APK_FILE}"
-          else
+          if [ -z "$APK_FILE" ]; then
             echo "Error: No APK found in app/build/outputs/apk/debug/"
             exit 1
           fi
-        id: package_apk
+
+          VERSIONED_NAME="PCViewPort_v${{ steps.version.outputs.version_name }}.apk"
+          FINAL_APK="release-assets/${VERSIONED_NAME}"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          BUILD_TOOLS_DIR=""
+          if [ -n "$SDK_ROOT" ] && [ -d "$SDK_ROOT/build-tools" ]; then
+            LATEST_BT=$(ls -1 "$SDK_ROOT/build-tools" | sort -V | tail -n 1)
+            if [ -n "$LATEST_BT" ]; then
+              BUILD_TOOLS_DIR="$SDK_ROOT/build-tools/$LATEST_BT"
+            fi
+          fi
+
+          if [ -n "$BUILD_TOOLS_DIR" ] && [ -x "$BUILD_TOOLS_DIR/zipalign" ] && [ -x "$BUILD_TOOLS_DIR/apksigner" ]; then
+            "$BUILD_TOOLS_DIR/zipalign" -P 16 -f 4 "$APK_FILE" "release-assets/aligned.apk"
+            "$BUILD_TOOLS_DIR/apksigner" sign \
+              --ks debug.keystore \
+              --ks-pass pass:android \
+              --ks-key-alias androiddebugkey \
+              --key-pass pass:android \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              --out "$FINAL_APK" \
+              "release-assets/aligned.apk"
+            rm -f "release-assets/aligned.apk" "${FINAL_APK}.idsig"
+            "$BUILD_TOOLS_DIR/apksigner" verify --verbose --print-certs "$FINAL_APK"
+            "$BUILD_TOOLS_DIR/zipalign" -c -P 16 -v 4 "$FINAL_APK" | tail -n 5
+          else
+            cp "$APK_FILE" "$FINAL_APK"
+          fi
+
+          echo "apk_path=${FINAL_APK}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=${VERSIONED_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Prepared verified APK: ${VERSIONED_NAME} from ${APK_FILE}"
 
       - name: Publish Direct APK to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -138,6 +164,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload APK Artifact
+        if: ${{ inputs.upload_artifact == true && steps.package_apk.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
