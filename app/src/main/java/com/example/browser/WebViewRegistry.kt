@@ -410,10 +410,10 @@ class WebViewRegistry {
                 }
             }
 
-            if (initialUrl.isNotBlank()) {
+            if (initialUrl.isNotBlank() && !UrlResolver.isInternalPage(initialUrl)) {
                 post {
                     if (url == null) {
-                        loadUrl(initialUrl)
+                        runCatching { loadUrl(initialUrl) }
                     }
                 }
             }
@@ -484,8 +484,12 @@ class WebViewRegistry {
         } else {
             code
         }
-        webView.evaluateJavascript(scriptToRun) { rawResult ->
-            onResult(rawResult ?: "undefined")
+        runCatching {
+            webView.evaluateJavascript(scriptToRun) { rawResult ->
+                onResult(rawResult ?: "undefined")
+            }
+        }.onFailure { error ->
+            onResult("JS error: ${error.localizedMessage ?: "unable to evaluate"}")
         }
     }
 
@@ -499,8 +503,12 @@ class WebViewRegistry {
             onResult(null)
             return
         }
-        webView.evaluateJavascript(script) { rawResult ->
-            onResult(rawResult)
+        runCatching {
+            webView.evaluateJavascript(script) { rawResult ->
+                onResult(rawResult)
+            }
+        }.onFailure {
+            onResult(null)
         }
     }
 
@@ -538,12 +546,16 @@ class WebViewRegistry {
 
     fun clearAllBrowsingData() {
         webViews.values.forEach { webView ->
-            webView.clearCache(true)
-            webView.clearFormData()
+            runCatching { webView.clearCache(true) }
+            runCatching { webView.clearFormData() }
         }
-        CookieManager.getInstance().removeAllCookies(null)
-        CookieManager.getInstance().flush()
-        WebStorage.getInstance().deleteAllData()
+        runCatching {
+            CookieManager.getInstance().removeAllCookies(null)
+            CookieManager.getInstance().flush()
+        }
+        runCatching {
+            WebStorage.getInstance().deleteAllData()
+        }
     }
 
     fun detachContext(tabId: String) {
@@ -572,7 +584,8 @@ class WebViewRegistry {
     }
 
     fun loadUrl(tabId: String, url: String) {
-        webViews[tabId]?.loadUrl(url)
+        if (UrlResolver.isInternalPage(url)) return
+        runCatching { webViews[tabId]?.loadUrl(url) }
     }
 
     fun goBack(tabId: String): Boolean {
@@ -703,14 +716,18 @@ class WebViewRegistry {
 
         @Suppress("DEPRECATION")
         fun applyForceDark(settings: WebSettings, enabled: Boolean) {
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, enabled)
+            runCatching {
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, enabled)
+                }
             }
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                WebSettingsCompat.setForceDark(
-                    settings,
-                    if (enabled) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF
-                )
+            runCatching {
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                    WebSettingsCompat.setForceDark(
+                        settings,
+                        if (enabled) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF
+                    )
+                }
             }
         }
 

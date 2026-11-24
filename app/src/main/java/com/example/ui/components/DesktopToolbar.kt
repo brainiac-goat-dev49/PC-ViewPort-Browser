@@ -31,18 +31,22 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Tab
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +66,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -70,14 +76,30 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.example.R
 import com.example.browser.BrowserTabState
+import com.example.browser.UrlResolver
+import com.example.data.BookmarkEntity
+import com.example.data.HistoryEntity
+import com.example.data.SavedPwaEntity
+import com.example.ui.OmniboxSuggestion
+import com.example.ui.OmniboxSuggestionEngine
+import com.example.ui.SuggestionSource
 import com.example.ui.theme.OmniboxTextStyle
 
 @Composable
 fun DesktopToolbar(
     activeTab: BrowserTabState?,
+    tabs: List<BrowserTabState>,
+    bookmarks: List<BookmarkEntity>,
+    history: List<HistoryEntity>,
+    savedPwas: List<SavedPwaEntity>,
     isBookmarked: Boolean,
     bookmarkCount: Int,
     adBlockerEnabled: Boolean,
@@ -94,9 +116,11 @@ fun DesktopToolbar(
     onRefreshOrStop: () -> Unit,
     onHome: () -> Unit,
     onNavigate: (String) -> Unit,
+    onSelectTab: (String) -> Unit,
     onToggleDesktopMode: () -> Unit,
     onToggleBookmark: () -> Unit,
     onOpenBookmarks: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit,
     onToggleDevTools: () -> Unit,
     onOpenAiAnalyst: () -> Unit,
@@ -152,7 +176,12 @@ fun DesktopToolbar(
                             isBookmarked = isBookmarked,
                             isIncognito = isIncognito,
                             disableSoftKeyboard = disableSoftKeyboard,
+                            tabs = tabs,
+                            bookmarks = bookmarks,
+                            history = history,
+                            savedPwas = savedPwas,
                             onNavigate = onNavigate,
+                            onSelectTab = onSelectTab,
                             onToggleBookmark = onToggleBookmark,
                             modifier = Modifier.weight(1f)
                         )
@@ -172,6 +201,7 @@ fun DesktopToolbar(
                             onOpenAiAnalyst = onOpenAiAnalyst,
                             onOpenQuickActions = onOpenQuickActions,
                             onOpenBookmarks = onOpenBookmarks,
+                            onOpenHistory = onOpenHistory,
                             onOpenDownloads = onOpenDownloads,
                             onToggleDevTools = onToggleDevTools,
                             onOpenSettings = onOpenSettings
@@ -193,7 +223,12 @@ fun DesktopToolbar(
                                 isBookmarked = isBookmarked,
                                 isIncognito = isIncognito,
                                 disableSoftKeyboard = disableSoftKeyboard,
+                                tabs = tabs,
+                                bookmarks = bookmarks,
+                                history = history,
+                                savedPwas = savedPwas,
                                 onNavigate = onNavigate,
+                                onSelectTab = onSelectTab,
                                 onToggleBookmark = onToggleBookmark,
                                 modifier = Modifier.weight(1f)
                             )
@@ -237,6 +272,7 @@ fun DesktopToolbar(
                                 onOpenAiAnalyst = onOpenAiAnalyst,
                                 onOpenQuickActions = onOpenQuickActions,
                                 onOpenBookmarks = onOpenBookmarks,
+                                onOpenHistory = onOpenHistory,
                                 onOpenDownloads = onOpenDownloads,
                                 onToggleDevTools = onToggleDevTools,
                                 onOpenSettings = onOpenSettings
@@ -372,6 +408,7 @@ private fun UtilityCluster(
     onOpenAiAnalyst: () -> Unit,
     onOpenQuickActions: () -> Unit,
     onOpenBookmarks: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit,
     onToggleDevTools: () -> Unit,
     onOpenSettings: () -> Unit
@@ -427,6 +464,21 @@ private fun UtilityCluster(
                     imageVector = Icons.Rounded.Apps,
                     contentDescription = stringResource(R.string.cd_quick_actions),
                     tint = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
+
+        DesktopTooltipWrap("Browsing History", showTooltips) {
+            IconButton(
+                onClick = onOpenHistory,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("history_manager_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.History,
+                    contentDescription = stringResource(R.string.cd_history_manager),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -508,26 +560,51 @@ private fun OmniboxField(
     isBookmarked: Boolean,
     isIncognito: Boolean,
     disableSoftKeyboard: Boolean,
+    tabs: List<BrowserTabState>,
+    bookmarks: List<BookmarkEntity>,
+    history: List<HistoryEntity>,
+    savedPwas: List<SavedPwaEntity>,
     onNavigate: (String) -> Unit,
+    onSelectTab: (String) -> Unit,
     onToggleBookmark: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val density = LocalDensity.current
+    val displayUrl = if (UrlResolver.isStartPage(currentUrl)) "" else currentUrl
+
     var isFocused by remember { mutableStateOf(false) }
+    var suppressPopup by remember { mutableStateOf(false) }
+    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
     var textFieldValue by remember(tabId) {
-        mutableStateOf(TextFieldValue(text = currentUrl))
+        mutableStateOf(TextFieldValue(text = displayUrl))
     }
 
-    LaunchedEffect(tabId, currentUrl, isFocused) {
-        if (!isFocused && textFieldValue.text != currentUrl) {
-            textFieldValue = TextFieldValue(text = currentUrl)
+    LaunchedEffect(tabId, displayUrl, isFocused) {
+        if (!isFocused && textFieldValue.text != displayUrl) {
+            textFieldValue = TextFieldValue(text = displayUrl)
         }
     }
 
     LaunchedEffect(disableSoftKeyboard, isFocused) {
         if (disableSoftKeyboard && isFocused) {
             keyboardController?.hide()
+        }
+    }
+
+    val suggestions = remember(textFieldValue.text, isFocused, history, bookmarks, savedPwas, tabs) {
+        if (!isFocused) {
+            emptyList()
+        } else {
+            OmniboxSuggestionEngine.buildSuggestions(
+                query = textFieldValue.text,
+                history = history,
+                bookmarks = bookmarks,
+                savedPwas = savedPwas,
+                tabs = tabs,
+                maxResults = 7
+            )
         }
     }
 
@@ -538,126 +615,234 @@ private fun OmniboxField(
         else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
     }
 
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = if (isIncognito) Color(0xFF24193B) else MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(if (isFocused) 1.5.dp else 1.dp, borderColor),
-        modifier = modifier.height(42.dp)
+    Box(
+        modifier = modifier.onSizeChanged { anchorSize = it }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = if (isIncognito) Color(0xFF24193B) else MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(if (isFocused) 1.5.dp else 1.dp, borderColor),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp)
+                .height(42.dp)
         ) {
-            Icon(
-                imageVector = when {
-                    isIncognito -> Icons.Rounded.Security
-                    isHttps -> Icons.Rounded.Lock
-                    else -> Icons.Rounded.Public
-                },
-                contentDescription = stringResource(R.string.cd_site_security),
-                tint = when {
-                    isIncognito -> Color(0xFFC084FC)
-                    isHttps -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(16.dp)
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Box(
-                contentAlignment = Alignment.CenterStart,
-                modifier = Modifier.weight(1f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 4.dp)
             ) {
-                if (textFieldValue.text.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.omnibox_placeholder),
-                        style = OmniboxTextStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        maxLines = 1
-                    )
-                }
-
-                BasicTextField(
-                    value = textFieldValue,
-                    onValueChange = {
-                        textFieldValue = it
-                        if (disableSoftKeyboard) {
-                            keyboardController?.hide()
-                        }
+                Icon(
+                    imageVector = when {
+                        isIncognito -> Icons.Rounded.Security
+                        isHttps -> Icons.Rounded.Lock
+                        else -> Icons.Rounded.Public
                     },
-                    singleLine = true,
-                    textStyle = OmniboxTextStyle.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onGo = {
-                            focusManager.clearFocus()
-                            onNavigate(textFieldValue.text)
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { focusState ->
-                            val newlyFocused = focusState.isFocused
-                            if (newlyFocused && !isFocused) {
-                                textFieldValue = textFieldValue.copy(
-                                    selection = TextRange(0, textFieldValue.text.length)
-                                )
-                                if (disableSoftKeyboard) {
-                                    keyboardController?.hide()
-                                }
-                            }
-                            isFocused = newlyFocused
-                        }
-                        .testTag("omnibox_input")
+                    contentDescription = stringResource(R.string.cd_site_security),
+                    tint = when {
+                        isIncognito -> Color(0xFFC084FC)
+                        isHttps -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(16.dp)
                 )
-            }
 
-            if (isFocused && textFieldValue.text.isNotEmpty()) {
-                IconButton(
-                    onClick = { textFieldValue = TextFieldValue("") },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("omnibox_clear_button")
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Cancel,
-                        contentDescription = stringResource(R.string.cd_clear_omnibox),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    if (textFieldValue.text.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.omnibox_placeholder),
+                            style = OmniboxTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 1
+                        )
+                    }
+
+                    BasicTextField(
+                        value = textFieldValue,
+                        onValueChange = {
+                            textFieldValue = it
+                            suppressPopup = false
+                            if (disableSoftKeyboard) {
+                                keyboardController?.hide()
+                            }
+                        },
+                        singleLine = true,
+                        textStyle = OmniboxTextStyle.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Go
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onGo = {
+                                suppressPopup = true
+                                focusManager.clearFocus()
+                                onNavigate(textFieldValue.text)
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                val newlyFocused = focusState.isFocused
+                                if (newlyFocused && !isFocused) {
+                                    suppressPopup = false
+                                    textFieldValue = textFieldValue.copy(
+                                        selection = TextRange(0, textFieldValue.text.length)
+                                    )
+                                    if (disableSoftKeyboard) {
+                                        keyboardController?.hide()
+                                    }
+                                }
+                                isFocused = newlyFocused
+                            }
+                            .testTag("omnibox_input")
                     )
                 }
-            } else {
-                IconButton(
-                    onClick = onToggleBookmark,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("bookmark_star_button")
-                ) {
-                    Icon(
-                        imageVector = if (isBookmarked) {
-                            Icons.Rounded.Star
-                        } else {
-                            Icons.Rounded.StarBorder
+
+                if (isFocused && textFieldValue.text.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            textFieldValue = TextFieldValue("")
+                            suppressPopup = false
                         },
-                        contentDescription = stringResource(R.string.cd_bookmark_toggle),
-                        tint = if (isBookmarked) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(20.dp)
-                    )
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("omnibox_clear_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Cancel,
+                            contentDescription = stringResource(R.string.cd_clear_omnibox),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = onToggleBookmark,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("bookmark_star_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked) {
+                                Icons.Rounded.Star
+                            } else {
+                                Icons.Rounded.StarBorder
+                            },
+                            contentDescription = stringResource(R.string.cd_bookmark_toggle),
+                            tint = if (isBookmarked) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
+        }
+
+        if (isFocused && !suppressPopup && suggestions.isNotEmpty()) {
+            val popupWidthDp = with(density) {
+                if (anchorSize.width > 0) anchorSize.width.toDp() else 360.dp
+            }
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, anchorSize.height + 6),
+                onDismissRequest = { suppressPopup = true },
+                properties = PopupProperties(
+                    focusable = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true
+                )
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .width(popupWidthDp.coerceAtLeast(260.dp))
+                        .testTag("omnibox_suggestions_popup")
+                ) {
+                    Column {
+                        suggestions.forEachIndexed { idx, suggestion ->
+                            if (idx > 0) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            OmniboxSuggestionRow(
+                                suggestion = suggestion,
+                                index = idx,
+                                onClick = {
+                                    suppressPopup = true
+                                    focusManager.clearFocus()
+                                    if (suggestion.source == SuggestionSource.OPEN_TAB && suggestion.tabId != null) {
+                                        onSelectTab(suggestion.tabId)
+                                    } else {
+                                        onNavigate(suggestion.url)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OmniboxSuggestionRow(
+    suggestion: OmniboxSuggestion,
+    index: Int,
+    onClick: () -> Unit
+) {
+    val icon = when (suggestion.source) {
+        SuggestionSource.HISTORY -> Icons.Rounded.History
+        SuggestionSource.BOOKMARK -> Icons.Rounded.Star
+        SuggestionSource.SAVED_PWA -> Icons.Rounded.Widgets
+        SuggestionSource.OPEN_TAB -> Icons.Rounded.Tab
+        SuggestionSource.URL_DIRECT -> Icons.Rounded.Public
+        SuggestionSource.WEB_SEARCH -> Icons.Rounded.Search
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .minimumInteractiveComponentSize()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .testTag("omnibox_suggestion_$index")
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = suggestion.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = suggestion.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

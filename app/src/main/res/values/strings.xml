@@ -177,4 +177,50 @@
     <string name="bubble_notification_title">PC ViewPort Floating Bubble</string>
     <string name="bubble_notification_text">Tap the floating bubble for quick desktop browser actions.</string>
     <string name="bubble_stop_action">Hide Bubble</string>
+
+    <!-- History Management -->
+    <string name="cd_history_manager">Open browsing history</string>
+    <string name="history_title">Browsing History</string>
+    <string name="history_search_hint">Search visited pages &amp; URLs…</string>
+    <string name="history_clear_all">Clear All</string>
+    <string name="history_clear_confirm_title">Clear browsing history?</string>
+    <string name="history_clear_confirm_message">This removes all recorded non-incognito page visits from this device.</string>
+    <string name="history_empty_title">No browsing history yet</string>
+    <string name="history_empty_subtitle">Pages you visit in standard tabs appear here for quick search and reopen. Incognito tabs are never recorded.</string>
+    <string name="history_open_new_tab">Open in new tab</string>
+    <string name="history_delete_entry">Delete history entry</string>
+
+    <!-- Start Page & Session Restore -->
+    <string name="start_page_title">PC ViewPort Start Page</string>
+    <string name="start_page_subtitle">Desktop-class browsing with live suggestions, bookmarks, and workspace tools</string>
+    <string name="start_page_incognito_notice">Incognito Tab — History and session state are not saved for this tab.</string>
+    <string name="start_page_search_hint">Search Google or type a website URL…</string>
+    <string name="start_page_go">Go</string>
+    <string name="start_page_quick_links">Quick Access</string>
+    <string name="start_page_recent_history">Recent History</string>
+    <string name="start_page_view_all">View All</string>
+
+    <string name="settings_section_startup">Start Page &amp; Session Restore</string>
+    <string name="settings_start_page_enable">Use Built-In Start Page</string>
+    <string name="settings_start_page_tip">Opens the PC ViewPort Start Page for Home and new tabs instead of a single site.</string>
+    <string name="settings_custom_home_label">Fallback Home Page URL</string>
+    <string name="settings_restore_last_page">Restore Last Visited Page on Reopen</string>
+    <string name="settings_restore_last_page_tip">Reopens your previous non-incognito tabs and last visited URL when relaunching the app.</string>
+
+    <!-- GitHub In-App Updater -->
+    <string name="settings_section_updates">App Updates (GitHub Releases)</string>
+    <string name="settings_auto_update_check">Check for Updates on Startup</string>
+    <string name="settings_auto_update_check_tip">Queries GitHub Releases for a newer version of PC ViewPort when the app starts.</string>
+    <string name="settings_check_updates_button">Check for Updates</string>
+    <string name="settings_checking_updates">Checking GitHub Releases…</string>
+    <string name="update_dialog_title">Update Available: v%1$s</string>
+    <string name="update_dialog_version_compare">Installed: v%1$s → Latest: v%2$s</string>
+    <string name="update_dialog_whats_new">Release Notes</string>
+    <string name="update_dialog_update_now">Update Now</string>
+    <string name="update_dialog_install_apk">Install APK</string>
+    <string name="update_dialog_open_github">Open Release Page</string>
+    <string name="update_dialog_later">Later</string>
+    <string name="update_downloading_progress">Downloading APK… %1$d%%</string>
+    <string name="update_up_to_date">You are on the latest version (v%1$s)</string>
+    <string name="update_install_permission_needed">Allow installing updates from PC ViewPort in system settings, then tap Install APK.</string>
 </resources>

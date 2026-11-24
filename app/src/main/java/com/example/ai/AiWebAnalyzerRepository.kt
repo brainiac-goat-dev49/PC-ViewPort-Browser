@@ -2,7 +2,9 @@ package com.example.ai
 
 import android.util.Log
 import com.google.firebase.Firebase
+import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.FirebaseAIException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
@@ -58,8 +60,12 @@ interface WebAnalyzer {
 
 class AiWebAnalyzerRepository : WebAnalyzer {
 
-    private val model by lazy {
-        Firebase.ai.generativeModel("gemini-3.8-flash")
+    private var cachedModel: GenerativeModel? = null
+
+    private fun getOrCreateModel(): GenerativeModel {
+        return cachedModel ?: synchronized(this) {
+            cachedModel ?: Firebase.ai.generativeModel(MODEL_NAME).also { cachedModel = it }
+        }
     }
 
     override fun analyzePageStream(
@@ -69,6 +75,21 @@ class AiWebAnalyzerRepository : WebAnalyzer {
     ): Flow<AiAnalysisUiState> = flow {
         emit(AiAnalysisUiState.Loading)
         val prompt = buildPrompt(snapshot, mode, customQuestion)
+        val model = try {
+            getOrCreateModel()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize Gemini model", t)
+            emit(
+                AiAnalysisUiState.Error(
+                    t.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: "Gemini AI could not be initialized on this device."
+                )
+            )
+            return@flow
+        }
+
         val accumulated = StringBuilder()
         try {
             withTimeout(60_000L) {
@@ -90,13 +111,40 @@ class AiWebAnalyzerRepository : WebAnalyzer {
             emit(AiAnalysisUiState.Error("Analysis timed out after 60 seconds. Please try again."))
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            Log.e(TAG, "Firebase AI web analysis failed", e)
-            emit(
-                AiAnalysisUiState.Error(
-                    e.localizedMessage ?: "Failed to analyze web page with Gemini."
-                )
-            )
+        } catch (streamError: Throwable) {
+            Log.e(TAG, "Firebase AI stream analysis failed", streamError)
+            if (accumulated.isNotBlank()) {
+                emit(AiAnalysisUiState.Success(accumulated.toString()))
+                return@flow
+            }
+            // Retry once with unary generateContent when stream fails unexpectedly (not FirebaseAIException)
+            if (streamError !is FirebaseAIException) {
+                val unaryResult = try {
+                    withTimeout(45_000L) {
+                        model.generateContent(prompt).text.orEmpty()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (unaryError: Throwable) {
+                    Log.e(TAG, "Firebase AI unary fallback failed", unaryError)
+                    emit(AiAnalysisUiState.Error(formatErrorMessage(unaryError)))
+                    return@flow
+                }
+
+                if (unaryResult.isNotBlank()) {
+                    emit(AiAnalysisUiState.Success(unaryResult))
+                    return@flow
+                }
+            }
+            emit(AiAnalysisUiState.Error(formatErrorMessage(streamError)))
+        }
+    }
+
+    private fun formatErrorMessage(error: Throwable): String {
+        val raw = error.localizedMessage?.trim().orEmpty()
+        return when {
+            raw.isNotBlank() -> raw
+            else -> "Failed to analyze web page with Gemini (${error::class.simpleName ?: "Error"})."
         }
     }
 
@@ -139,5 +187,6 @@ class AiWebAnalyzerRepository : WebAnalyzer {
 
     companion object {
         private const val TAG = "AiWebAnalyzer"
+        private const val MODEL_NAME = "gemini-3.8-flash"
     }
 }

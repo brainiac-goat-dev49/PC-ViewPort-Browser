@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.FindInPage
 import androidx.compose.material.icons.rounded.FolderSpecial
 import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.NoteAdd
@@ -68,6 +69,7 @@ fun QuickActionsPage(
     floatingBubbleEnabled: Boolean,
     savedPwas: List<SavedPwaEntity>,
     onBack: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenAiAnalyst: () -> Unit,
     onOpenNews: () -> Unit,
     onOpenMediaDownloader: () -> Unit,
@@ -196,6 +198,13 @@ fun QuickActionsPage(
                         }
 
                         val actions = listOf(
+                            QuickActionTile(
+                                icon = Icons.Rounded.History,
+                                title = stringResource(R.string.history_title),
+                                subtitle = "Search, reopen or clear visited sites",
+                                testTag = "qa_history",
+                                onClick = onOpenHistory
+                            ),
                             QuickActionTile(
                                 icon = Icons.Rounded.AutoAwesome,
                                 title = stringResource(R.string.ai_analyst_title),

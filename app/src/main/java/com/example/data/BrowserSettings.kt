@@ -49,5 +49,24 @@ data class BrowserSettings(
     val aiWebAnalyzingEnabled: Boolean = true,
     val showTooltips: Boolean = true,
     val hasCompletedTour: Boolean = false,
-    val floatingBubbleEnabled: Boolean = false
+    val floatingBubbleEnabled: Boolean = false,
+    val startPageEnabled: Boolean = true,
+    val customHomeUrl: String = "https://www.google.com",
+    val restoreLastPageOnStartup: Boolean = true,
+    val autoCheckUpdatesOnStartup: Boolean = true
+)
+
+data class PersistedTabSnapshot(
+    val url: String,
+    val title: String,
+    val isDesktopMode: Boolean = true,
+    val isLocked: Boolean = false,
+    val groupName: String? = null,
+    val groupColorHex: Long = 0xFF38BDF8L
+)
+
+data class PersistedSessionState(
+    val tabs: List<PersistedTabSnapshot>,
+    val activeIndex: Int = 0,
+    val savedAt: Long = System.currentTimeMillis()
 )

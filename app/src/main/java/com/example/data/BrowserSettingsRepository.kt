@@ -12,6 +12,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "pc_viewport_settings"
@@ -19,7 +21,10 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 
 interface SettingsStore {
     val settings: Flow<BrowserSettings>
+    val sessionState: Flow<PersistedSessionState?>
     suspend fun update(transform: (BrowserSettings) -> BrowserSettings)
+    suspend fun saveSessionState(session: PersistedSessionState)
+    suspend fun clearSessionState()
 }
 
 class BrowserSettingsRepository(private val context: Context) : SettingsStore {
@@ -44,10 +49,19 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
         val SHOW_TOOLTIPS = booleanPreferencesKey("show_tooltips")
         val HAS_COMPLETED_TOUR = booleanPreferencesKey("has_completed_tour")
         val FLOATING_BUBBLE = booleanPreferencesKey("floating_bubble_enabled")
+        val START_PAGE_ENABLED = booleanPreferencesKey("start_page_enabled")
+        val CUSTOM_HOME_URL = stringPreferencesKey("custom_home_url")
+        val RESTORE_LAST_PAGE = booleanPreferencesKey("restore_last_page_on_startup")
+        val LAST_SESSION_JSON = stringPreferencesKey("last_browser_session_json")
+        val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_updates_on_startup")
     }
 
     override val settings: Flow<BrowserSettings> = context.settingsDataStore.data.map { prefs ->
         readFromPrefs(prefs)
+    }
+
+    override val sessionState: Flow<PersistedSessionState?> = context.settingsDataStore.data.map { prefs ->
+        decodeSessionJson(prefs[Keys.LAST_SESSION_JSON])
     }
 
     override suspend fun update(transform: (BrowserSettings) -> BrowserSettings) {
@@ -73,6 +87,24 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
             prefs[Keys.SHOW_TOOLTIPS] = next.showTooltips
             prefs[Keys.HAS_COMPLETED_TOUR] = next.hasCompletedTour
             prefs[Keys.FLOATING_BUBBLE] = next.floatingBubbleEnabled
+            prefs[Keys.START_PAGE_ENABLED] = next.startPageEnabled
+            prefs[Keys.CUSTOM_HOME_URL] = next.customHomeUrl
+            prefs[Keys.RESTORE_LAST_PAGE] = next.restoreLastPageOnStartup
+            prefs[Keys.AUTO_CHECK_UPDATES] = next.autoCheckUpdatesOnStartup
+        }
+    }
+
+    override suspend fun saveSessionState(session: PersistedSessionState) {
+        if (session.tabs.isEmpty()) return
+        val encoded = encodeSessionJson(session)
+        context.settingsDataStore.edit { prefs ->
+            prefs[Keys.LAST_SESSION_JSON] = encoded
+        }
+    }
+
+    override suspend fun clearSessionState() {
+        context.settingsDataStore.edit { prefs ->
+            prefs.remove(Keys.LAST_SESSION_JSON)
         }
     }
 
@@ -98,7 +130,105 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
             aiWebAnalyzingEnabled = prefs[Keys.AI_WEB_ANALYZING] ?: true,
             showTooltips = prefs[Keys.SHOW_TOOLTIPS] ?: true,
             hasCompletedTour = prefs[Keys.HAS_COMPLETED_TOUR] ?: false,
-            floatingBubbleEnabled = prefs[Keys.FLOATING_BUBBLE] ?: false
+            floatingBubbleEnabled = prefs[Keys.FLOATING_BUBBLE] ?: false,
+            startPageEnabled = prefs[Keys.START_PAGE_ENABLED] ?: true,
+            customHomeUrl = prefs[Keys.CUSTOM_HOME_URL] ?: "https://www.google.com",
+            restoreLastPageOnStartup = prefs[Keys.RESTORE_LAST_PAGE] ?: true,
+            autoCheckUpdatesOnStartup = prefs[Keys.AUTO_CHECK_UPDATES] ?: true
         )
+    }
+
+    companion object {
+        private const val FORMAT_HEADER = "PCVP_SESSION_V1"
+
+        private fun encodeField(value: String): String =
+            java.net.URLEncoder.encode(value, "UTF-8")
+
+        private fun decodeField(value: String): String =
+            java.net.URLDecoder.decode(value, "UTF-8")
+
+        fun encodeSessionJson(session: PersistedSessionState): String {
+            return buildString {
+                append(FORMAT_HEADER).append('\n')
+                append(session.activeIndex).append('|').append(session.savedAt).append('\n')
+                session.tabs.forEach { tab ->
+                    append(encodeField(tab.url)).append('|')
+                    append(encodeField(tab.title)).append('|')
+                    append(tab.isDesktopMode).append('|')
+                    append(tab.isLocked).append('|')
+                    append(encodeField(tab.groupName.orEmpty())).append('|')
+                    append(tab.groupColorHex).append('\n')
+                }
+            }
+        }
+
+        fun decodeSessionJson(raw: String?): PersistedSessionState? {
+            if (raw.isNullOrBlank()) return null
+            if (raw.trimStart().startsWith("{")) {
+                return decodeLegacyJson(raw)
+            }
+            return runCatching {
+                val lines = raw.lineSequence().filter { it.isNotEmpty() }.toList()
+                if (lines.size < 3 || lines[0] != FORMAT_HEADER) return@runCatching null
+                val meta = lines[1].split('|')
+                val activeIndex = meta.getOrNull(0)?.toIntOrNull() ?: 0
+                val savedAt = meta.getOrNull(1)?.toLongOrNull() ?: System.currentTimeMillis()
+                val tabs = lines.drop(2).mapNotNull { line ->
+                    val parts = line.split('|')
+                    if (parts.size < 6) return@mapNotNull null
+                    val url = decodeField(parts[0]).trim()
+                    if (url.isEmpty()) return@mapNotNull null
+                    val title = decodeField(parts[1]).ifBlank { url }
+                    val isDesktop = parts[2].toBooleanStrictOrNull() ?: true
+                    val isLocked = parts[3].toBooleanStrictOrNull() ?: false
+                    val groupName = decodeField(parts[4]).takeIf { it.isNotBlank() }
+                    val groupColor = parts[5].toLongOrNull() ?: 0xFF38BDF8L
+                    PersistedTabSnapshot(
+                        url = url,
+                        title = title,
+                        isDesktopMode = isDesktop,
+                        isLocked = isLocked,
+                        groupName = groupName,
+                        groupColorHex = groupColor
+                    )
+                }
+                if (tabs.isEmpty()) return@runCatching null
+                PersistedSessionState(
+                    tabs = tabs,
+                    activeIndex = activeIndex.coerceIn(0, tabs.lastIndex),
+                    savedAt = savedAt
+                )
+            }.getOrNull()
+        }
+
+        private fun decodeLegacyJson(raw: String): PersistedSessionState? {
+            return runCatching {
+                val root = JSONObject(raw)
+                val arr = root.optJSONArray("tabs") ?: return@runCatching null
+                val tabs = buildList {
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        val url = obj.optString("url").trim()
+                        if (url.isEmpty()) continue
+                        add(
+                            PersistedTabSnapshot(
+                                url = url,
+                                title = obj.optString("title").ifBlank { url },
+                                isDesktopMode = obj.optBoolean("isDesktopMode", true),
+                                isLocked = obj.optBoolean("isLocked", false),
+                                groupName = obj.optString("groupName").takeIf { it.isNotBlank() },
+                                groupColorHex = obj.optLong("groupColorHex", 0xFF38BDF8L)
+                            )
+                        )
+                    }
+                }
+                if (tabs.isEmpty()) return@runCatching null
+                PersistedSessionState(
+                    tabs = tabs,
+                    activeIndex = root.optInt("activeIndex", 0).coerceIn(0, tabs.lastIndex),
+                    savedAt = root.optLong("savedAt", System.currentTimeMillis())
+                )
+            }.getOrNull()
+        }
     }
 }

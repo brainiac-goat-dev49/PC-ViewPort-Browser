@@ -13,9 +13,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DownloadEntity::class,
         PasswordEntity::class,
         NoteClipEntity::class,
-        SavedPwaEntity::class
+        SavedPwaEntity::class,
+        HistoryEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class BrowserDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class BrowserDatabase : RoomDatabase() {
     abstract fun passwordDao(): PasswordDao
     abstract fun noteClipDao(): NoteClipDao
     abstract fun savedPwaDao(): SavedPwaDao
+    abstract fun historyDao(): HistoryDao
 
     companion object {
         @Volatile
@@ -84,6 +86,28 @@ abstract class BrowserDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
+                        `visitedAt` INTEGER NOT NULL,
+                        `visitCount` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_history_url` ON `history` (`url`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_history_visitedAt` ON `history` (`visitedAt`)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): BrowserDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -91,7 +115,7 @@ abstract class BrowserDatabase : RoomDatabase() {
                     BrowserDatabase::class.java,
                     "pc_viewport_browser.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }

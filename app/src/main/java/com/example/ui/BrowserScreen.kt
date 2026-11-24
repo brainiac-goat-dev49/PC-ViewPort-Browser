@@ -40,15 +40,18 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.browser.UrlResolver
 import com.example.browser.WebViewRegistry
 import com.example.system.ScreenshotStorageHelper
 import com.example.ui.components.AiAnalystPage
+import com.example.ui.components.AppUpdateDialog
 import com.example.ui.components.BookmarkEditDialog
 import com.example.ui.components.BookmarksPage
 import com.example.ui.components.BrowserTabStrip
 import com.example.ui.components.DesktopToolbar
 import com.example.ui.components.DevToolsConsoleDrawer
 import com.example.ui.components.DownloadsPage
+import com.example.ui.components.HistoryPage
 import com.example.ui.components.ImageViewerPage
 import com.example.ui.components.MediaDownloaderPage
 import com.example.ui.components.NewsPage
@@ -69,6 +72,7 @@ fun BrowserScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingGeo by viewModel.pendingGeolocation.collectAsStateWithLifecycle()
     val pendingDownload by viewModel.pendingDownload.collectAsStateWithLifecycle()
+    val pendingInstallPermission by viewModel.pendingInstallPermissionRequest.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -110,6 +114,12 @@ fun BrowserScreen(
         } else {
             viewModel.showStatusMessage("Overlay permission denied for floating bubble")
         }
+    }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.onInstallPermissionResult(context)
     }
 
     fun handleToggleFloatingBubble(enable: Boolean) {
@@ -166,6 +176,20 @@ fun BrowserScreen(
             viewModel.showStatusMessage(context.getString(R.string.download_started, fileName))
         } else {
             viewModel.showStatusMessage(context.getString(R.string.download_failed))
+        }
+    }
+
+    LaunchedEffect(pendingInstallPermission) {
+        if (pendingInstallPermission) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${context.packageName}")
+                )
+                installPermissionLauncher.launch(intent)
+            } else {
+                viewModel.onInstallPermissionResult(context)
+            }
         }
     }
 
@@ -269,6 +293,10 @@ fun BrowserScreen(
 
                         DesktopToolbar(
                             activeTab = activeTab,
+                            tabs = uiState.tabs,
+                            bookmarks = uiState.bookmarks,
+                            history = uiState.history,
+                            savedPwas = uiState.savedPwas,
                             isBookmarked = uiState.isCurrentPageBookmarked,
                             bookmarkCount = uiState.bookmarks.size,
                             adBlockerEnabled = uiState.settings.adBlockerEnabled,
@@ -285,6 +313,7 @@ fun BrowserScreen(
                             onRefreshOrStop = { viewModel.refreshOrStop() },
                             onHome = { viewModel.goHome() },
                             onNavigate = { input -> viewModel.navigateTo(input) },
+                            onSelectTab = viewModel::selectTab,
                             onToggleDesktopMode = {
                                 val isDesktop = viewModel.toggleDesktopMode()
                                 viewModel.showStatusMessage(
@@ -305,6 +334,7 @@ fun BrowserScreen(
                                 }
                             },
                             onOpenBookmarks = { viewModel.openBookmarksSheet() },
+                            onOpenHistory = { viewModel.openHistoryPage() },
                             onOpenDownloads = { viewModel.openDownloadsSheet() },
                             onToggleDevTools = { viewModel.toggleDevTools() },
                             onOpenAiAnalyst = { viewModel.openAiAnalystPage() },
@@ -317,7 +347,21 @@ fun BrowserScreen(
 
                         WebViewViewport(
                             activeTab = activeTab,
+                            tabs = uiState.tabs,
+                            bookmarks = uiState.bookmarks,
+                            history = uiState.history,
+                            savedPwas = uiState.savedPwas,
+                            aiEnabled = uiState.settings.aiWebAnalyzingEnabled,
                             getOrCreateWebView = viewModel::getOrCreateWebView,
+                            onNavigate = { input -> viewModel.navigateTo(input) },
+                            onSelectTab = viewModel::selectTab,
+                            onOpenHistory = viewModel::openHistoryPage,
+                            onOpenBookmarks = viewModel::openBookmarksSheet,
+                            onOpenDownloads = viewModel::openDownloadsSheet,
+                            onOpenAiAnalyst = { viewModel.openAiAnalystPage() },
+                            onOpenNews = { viewModel.openNewsPage() },
+                            onOpenQuickActions = viewModel::openQuickActionsPage,
+                            onOpenSettings = { viewModel.openSettingsSheet(context) },
                             onReleaseContext = viewModel::releaseWebViewContext,
                             onViewportSizeMeasured = viewModel::updateViewportSizeDp,
                             modifier = Modifier.weight(1f)
@@ -339,12 +383,22 @@ fun BrowserScreen(
 
                         ActiveToolPage.BOOKMARKS -> BookmarksPage(
                             bookmarks = uiState.bookmarks,
-                            canBookmarkCurrentPage = activeTab != null && activeTab.url.isNotBlank(),
+                            canBookmarkCurrentPage = activeTab != null &&
+                                activeTab.url.isNotBlank() &&
+                                !UrlResolver.isInternalPage(activeTab.url),
                             onBack = viewModel::closeActiveToolPage,
                             onAddCurrentPage = viewModel::openAddBookmarkDialog,
                             onOpenBookmark = viewModel::openBookmark,
                             onEditBookmark = viewModel::openEditBookmarkDialog,
                             onDeleteBookmark = viewModel::deleteBookmark
+                        )
+
+                        ActiveToolPage.HISTORY -> HistoryPage(
+                            history = uiState.history,
+                            onBack = viewModel::closeActiveToolPage,
+                            onOpenHistoryItem = viewModel::openHistoryItem,
+                            onDeleteHistoryEntry = viewModel::deleteHistoryEntry,
+                            onClearAll = viewModel::clearHistory
                         )
 
                         ActiveToolPage.DOWNLOADS -> DownloadsPage(
@@ -379,6 +433,13 @@ fun BrowserScreen(
                             onToggleAiAnalyzing = viewModel::setAiWebAnalyzingEnabled,
                             onToggleTooltips = viewModel::setShowTooltips,
                             onToggleFloatingBubble = { enabled -> handleToggleFloatingBubble(enabled) },
+                            onToggleStartPage = viewModel::setStartPageEnabled,
+                            onUpdateCustomHomeUrl = viewModel::setCustomHomeUrl,
+                            onToggleRestoreLastPage = viewModel::setRestoreLastPageOnStartup,
+                            appUpdateState = uiState.appUpdateState,
+                            onToggleAutoCheckUpdates = viewModel::setAutoCheckUpdatesOnStartup,
+                            onCheckForUpdates = { viewModel.checkForUpdates(userInitiated = true) },
+                            onOpenUpdateDialog = viewModel::openUpdateDialog,
                             onStartTourGuide = viewModel::startTourGuide,
                             onClearBrowsingData = {
                                 viewModel.clearAllBrowsingData(context.getString(R.string.settings_data_cleared))
@@ -392,6 +453,7 @@ fun BrowserScreen(
                             floatingBubbleEnabled = uiState.settings.floatingBubbleEnabled,
                             savedPwas = uiState.savedPwas,
                             onBack = viewModel::closeActiveToolPage,
+                            onOpenHistory = viewModel::openHistoryPage,
                             onOpenAiAnalyst = { viewModel.openAiAnalystPage() },
                             onOpenNews = { viewModel.openNewsPage() },
                             onOpenMediaDownloader = viewModel::openMediaDownloaderPage,
@@ -572,6 +634,18 @@ fun BrowserScreen(
                         }
                     )
                 }
+            }
+
+            if (uiState.isUpdateDialogVisible) {
+                AppUpdateDialog(
+                    state = uiState.appUpdateState,
+                    onUpdateNow = { viewModel.startAppUpdateDownload(context) },
+                    onOpenReleasePage = { releaseUrl ->
+                        viewModel.dismissUpdateDialog()
+                        viewModel.openNewTab(url = releaseUrl, select = true)
+                    },
+                    onDismiss = viewModel::dismissUpdateDialog
+                )
             }
         }
     }

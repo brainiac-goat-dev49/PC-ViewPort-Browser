@@ -3,7 +3,9 @@ package com.example
 import com.example.browser.BrowserConfig
 import com.example.browser.UrlResolver
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UrlResolverTest {
@@ -42,6 +44,26 @@ class UrlResolverTest {
             "${BrowserConfig.GOOGLE_SEARCH_PREFIX}kotlin",
             UrlResolver.resolveInput("kotlin")
         )
+    }
+
+    @Test
+    fun `start page aliases and internal pages resolve accurately`() {
+        assertEquals(BrowserConfig.START_PAGE_URL, UrlResolver.resolveInput("about:start"))
+        assertEquals(BrowserConfig.START_PAGE_URL, UrlResolver.resolveInput(BrowserConfig.START_PAGE_URL))
+        assertTrue(UrlResolver.isStartPage(BrowserConfig.START_PAGE_URL))
+        assertTrue(UrlResolver.isStartPage("about:start"))
+        assertTrue(UrlResolver.isInternalPage(BrowserConfig.START_PAGE_URL))
+        assertFalse(UrlResolver.isInternalPage("https://github.com"))
+        assertEquals("Start Page", UrlResolver.extractDisplayHost(BrowserConfig.START_PAGE_URL))
+    }
+
+    @Test
+    fun `looksLikeUrlOrDomain distinguishes domains from search queries`() {
+        assertTrue(UrlResolver.looksLikeUrlOrDomain("github.com"))
+        assertTrue(UrlResolver.looksLikeUrlOrDomain("https://developer.android.com"))
+        assertTrue(UrlResolver.looksLikeUrlOrDomain("localhost:8080"))
+        assertFalse(UrlResolver.looksLikeUrlOrDomain("compose desktop browser"))
+        assertFalse(UrlResolver.looksLikeUrlOrDomain("kotlin"))
     }
 
     @Test

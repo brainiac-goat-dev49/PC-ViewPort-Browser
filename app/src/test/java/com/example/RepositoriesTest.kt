@@ -1,11 +1,18 @@
 package com.example
 
+import com.example.browser.BrowserConfig
+import com.example.data.BrowserSettingsRepository
+import com.example.data.HistoryDao
+import com.example.data.HistoryEntity
+import com.example.data.HistoryRepository
 import com.example.data.NoteClipDao
 import com.example.data.NoteClipEntity
 import com.example.data.NoteClipRepository
 import com.example.data.PasswordDao
 import com.example.data.PasswordEntity
 import com.example.data.PasswordRepository
+import com.example.data.PersistedSessionState
+import com.example.data.PersistedTabSnapshot
 import com.example.data.SavedPwaDao
 import com.example.data.SavedPwaEntity
 import com.example.data.SavedPwaRepository
@@ -16,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -78,6 +86,33 @@ private class FakeSavedPwaDao : SavedPwaDao {
     }
 }
 
+private class FakeHistoryDao : HistoryDao {
+    private val items = MutableStateFlow<List<HistoryEntity>>(emptyList())
+    private var seq = 1L
+
+    override fun observeAll(): Flow<List<HistoryEntity>> = items
+
+    override suspend fun getByUrl(url: String): HistoryEntity? {
+        return items.value.firstOrNull { it.url == url }
+    }
+
+    override suspend fun insertOrReplace(entity: HistoryEntity): Long {
+        val id = if (entity.id > 0L) entity.id else seq++
+        val saved = entity.copy(id = id)
+        items.value = (listOf(saved) + items.value.filterNot { it.id == id || it.url == entity.url })
+            .sortedByDescending { it.visitedAt }
+        return id
+    }
+
+    override suspend fun deleteById(id: Long) {
+        items.value = items.value.filterNot { it.id == id }
+    }
+
+    override suspend fun clearAll() {
+        items.value = emptyList()
+    }
+}
+
 class RepositoriesTest {
 
     @Test
@@ -130,5 +165,67 @@ class RepositoriesTest {
 
         repo.removePwa(pwa.id)
         assertTrue(repo.pwas.first().isEmpty())
+    }
+
+    @Test
+    fun `historyRepository records visits, increments counts, updates titles, and ignores internal urls`() = runTest {
+        val repo = HistoryRepository(FakeHistoryDao())
+
+        repo.recordVisit(title = "Start Page", url = BrowserConfig.START_PAGE_URL)
+        repo.recordVisit(title = "Blank", url = "about:blank")
+        assertTrue(repo.history.first().isEmpty())
+
+        repo.recordVisit(title = "", url = "https://github.com")
+        val first = repo.history.first().single()
+        assertEquals("github.com", first.title)
+        assertEquals(1, first.visitCount)
+
+        repo.updateTitleIfPresent(url = "https://github.com", title = "GitHub: Build software")
+        assertEquals("GitHub: Build software", repo.history.first().single().title)
+
+        repo.recordVisit(title = "", url = "https://github.com")
+        val revisited = repo.history.first().single()
+        assertEquals(2, revisited.visitCount)
+        assertEquals("GitHub: Build software", revisited.title)
+
+        repo.deleteEntry(revisited.id)
+        assertTrue(repo.history.first().isEmpty())
+
+        repo.recordVisit(title = "Kotlin", url = "https://kotlinlang.org")
+        assertEquals(1, repo.history.first().size)
+        repo.clearAll()
+        assertTrue(repo.history.first().isEmpty())
+    }
+
+    @Test
+    fun `session json serialization roundtrip preserves tabs and active index`() {
+        val original = PersistedSessionState(
+            tabs = listOf(
+                PersistedTabSnapshot(
+                    url = "https://github.com",
+                    title = "GitHub",
+                    isDesktopMode = true,
+                    isLocked = true,
+                    groupName = "Work",
+                    groupColorHex = 0xFF34D399L
+                ),
+                PersistedTabSnapshot(
+                    url = "https://developer.android.com",
+                    title = "Android",
+                    isDesktopMode = false
+                )
+            ),
+            activeIndex = 1,
+            savedAt = 123456789L
+        )
+        val encoded = BrowserSettingsRepository.encodeSessionJson(original)
+        val decoded = BrowserSettingsRepository.decodeSessionJson(encoded)
+        assertNotNull(decoded)
+        assertEquals(2, decoded!!.tabs.size)
+        assertEquals(1, decoded.activeIndex)
+        assertEquals("https://github.com", decoded.tabs[0].url)
+        assertTrue(decoded.tabs[0].isLocked)
+        assertEquals("Work", decoded.tabs[0].groupName)
+        assertEquals(false, decoded.tabs[1].isDesktopMode)
     }
 }

@@ -5,20 +5,32 @@ import com.example.ai.AiAnalysisUiState
 import com.example.ai.PageSnapshot
 import com.example.ai.WebAnalyzer
 import com.example.browser.BrowserConfig
+import com.example.browser.BrowserTabState
+import com.example.data.BookmarkEntity
 import com.example.data.BookmarkRepository
+import com.example.data.BrowserSettings
 import com.example.data.CityPreset
+import com.example.data.HistoryEntity
 import com.example.data.MockLocationPresets
+import com.example.data.PersistedSessionState
+import com.example.data.PersistedTabSnapshot
+import com.example.data.SavedPwaEntity
+import com.example.data.SettingsStore
 import com.example.news.NewsArticle
 import com.example.news.NewsCategory
 import com.example.news.NewsFeedSource
 import com.example.ui.ActiveToolPage
 import com.example.ui.BrowserTourSteps
 import com.example.ui.BrowserViewModel
+import com.example.ui.OmniboxSuggestionEngine
+import com.example.ui.SuggestionSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -28,6 +40,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -35,7 +48,8 @@ import org.junit.Test
 
 private class FakeWebAnalyzer(
     private val chunks: List<String> = listOf("Summary part 1. ", "Summary part 2."),
-    private val shouldFail: Boolean = false
+    private val shouldFail: Boolean = false,
+    private val throwFatal: Throwable? = null
 ) : WebAnalyzer {
     var callCount: Int = 0
         private set
@@ -46,6 +60,7 @@ private class FakeWebAnalyzer(
         customQuestion: String
     ): Flow<AiAnalysisUiState> = flow {
         callCount++
+        throwFatal?.let { throw it }
         emit(AiAnalysisUiState.Loading)
         if (shouldFail) {
             emit(AiAnalysisUiState.Error("Simulated analyzer error"))
@@ -82,6 +97,29 @@ private class FakeNewsFeedSource(
     }
 }
 
+private class FakePersistentSettingsStore(
+    initialSettings: BrowserSettings = BrowserSettings(),
+    initialSession: PersistedSessionState? = null
+) : SettingsStore {
+    private val settingsFlow = MutableStateFlow(initialSettings)
+    val sessionFlow = MutableStateFlow(initialSession)
+
+    override val settings: Flow<BrowserSettings> = settingsFlow
+    override val sessionState: Flow<PersistedSessionState?> = sessionFlow
+
+    override suspend fun update(transform: (BrowserSettings) -> BrowserSettings) {
+        settingsFlow.update(transform)
+    }
+
+    override suspend fun saveSessionState(session: PersistedSessionState) {
+        sessionFlow.value = session
+    }
+
+    override suspend fun clearSessionState() {
+        sessionFlow.value = null
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class BrowserViewModelTest {
 
@@ -89,6 +127,7 @@ class BrowserViewModelTest {
     private lateinit var repository: BookmarkRepository
     private lateinit var fakeAnalyzer: FakeWebAnalyzer
     private lateinit var fakeNews: FakeNewsFeedSource
+    private lateinit var settingsStore: FakePersistentSettingsStore
     private lateinit var viewModel: BrowserViewModel
 
     @Before
@@ -97,8 +136,10 @@ class BrowserViewModelTest {
         repository = BookmarkRepository(FakeBookmarkDao())
         fakeAnalyzer = FakeWebAnalyzer()
         fakeNews = FakeNewsFeedSource(failCategories = setOf(NewsCategory.SCIENCE))
+        settingsStore = FakePersistentSettingsStore()
         viewModel = BrowserViewModel(
             bookmarkRepository = repository,
+            settingsStore = settingsStore,
             newsFeedSource = fakeNews,
             webAnalyzer = fakeAnalyzer
         )
@@ -110,7 +151,7 @@ class BrowserViewModelTest {
     }
 
     @Test
-    fun `initial tab uses desktop mode and Windows 11 Chrome UA constant`() = runTest {
+    fun `initial tab uses Start Page, desktop mode, and Windows 11 Chrome UA constant`() = runTest {
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
 
         val state = viewModel.uiState.value
@@ -119,7 +160,9 @@ class BrowserViewModelTest {
         assertFalse(state.activeTab!!.isIncognito)
         assertTrue(state.settings.aiWebAnalyzingEnabled)
         assertTrue(state.settings.showTooltips)
-        assertEquals(BrowserConfig.DEFAULT_HOME_URL, state.activeTab!!.url)
+        assertTrue(state.settings.startPageEnabled)
+        assertTrue(state.settings.restoreLastPageOnStartup)
+        assertEquals(BrowserConfig.START_PAGE_URL, state.activeTab!!.url)
         assertTrue(BrowserConfig.DESKTOP_USER_AGENT.contains("Windows NT 10.0; Win64; x64"))
         assertTrue(BrowserConfig.DESKTOP_USER_AGENT.contains("Chrome/131.0.0.0"))
     }
@@ -146,7 +189,156 @@ class BrowserViewModelTest {
         viewModel.closeTab(secondTabId)
         assertEquals(1, viewModel.uiState.value.tabs.size)
         assertNotEquals(secondTabId, viewModel.uiState.value.activeTabId)
-        assertEquals(BrowserConfig.DEFAULT_HOME_URL, viewModel.uiState.value.activeTab!!.url)
+        assertEquals(BrowserConfig.START_PAGE_URL, viewModel.uiState.value.activeTab!!.url)
+    }
+
+    @Test
+    fun `history records non-incognito visits, skips incognito, and supports delete and clear`() = runTest {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        val mainTabId = viewModel.uiState.value.activeTabId
+        viewModel.navigateTo("https://developer.android.com")
+        viewModel.onReceivedTitle(mainTabId, "Android Developers")
+        viewModel.onPageFinished(mainTabId, "https://developer.android.com", canGoBack = true, canGoForward = false)
+
+        assertEquals(1, viewModel.uiState.value.history.size)
+        assertEquals("Android Developers", viewModel.uiState.value.history.first().title)
+
+        // Visit inside incognito tab must not be recorded in history
+        viewModel.openNewTab("https://secret.example.com", isIncognito = true)
+        val incogId = viewModel.uiState.value.activeTabId
+        viewModel.onPageFinished(incogId, "https://secret.example.com", canGoBack = false, canGoForward = false)
+        assertEquals(1, viewModel.uiState.value.history.size)
+
+        // Open History Page and delete / clear
+        viewModel.openHistoryPage()
+        assertEquals(ActiveToolPage.HISTORY, viewModel.uiState.value.activeToolPage)
+        viewModel.deleteHistoryEntry(viewModel.uiState.value.history.first().id)
+        assertTrue(viewModel.uiState.value.history.isEmpty())
+
+        viewModel.onPageFinished(mainTabId, "https://kotlinlang.org", canGoBack = true, canGoForward = false)
+        assertEquals(1, viewModel.uiState.value.history.size)
+        viewModel.clearHistory()
+        assertTrue(viewModel.uiState.value.history.isEmpty())
+    }
+
+    @Test
+    fun `omnibox suggestion engine matches bookmarks, history, PWAs, open tabs, and search`() {
+        val bookmarks = listOf(
+            BookmarkEntity(id = 1L, title = "Kotlin Docs", url = "https://kotlinlang.org/docs")
+        )
+        val history = listOf(
+            HistoryEntity(id = 2L, title = "Ktor Server", url = "https://ktor.io", visitCount = 5, visitedAt = 200L),
+            HistoryEntity(id = 3L, title = "GitHub Android", url = "https://github.com/android", visitCount = 2, visitedAt = 100L)
+        )
+        val pwas = listOf(
+            SavedPwaEntity(id = 4L, name = "DevDocs", startUrl = "https://devdocs.io")
+        )
+        val tabs = listOf(
+            BrowserTabState(id = "t1", title = "Start Page", url = BrowserConfig.START_PAGE_URL),
+            BrowserTabState(id = "t2", title = "Kotlin Playground", url = "https://play.kotlinlang.org")
+        )
+
+        val suggestions = OmniboxSuggestionEngine.buildSuggestions(
+            query = "kot",
+            history = history,
+            bookmarks = bookmarks,
+            savedPwas = pwas,
+            tabs = tabs
+        )
+        assertTrue(suggestions.any { it.source == SuggestionSource.BOOKMARK && it.url == "https://kotlinlang.org/docs" })
+        assertTrue(suggestions.any { it.source == SuggestionSource.OPEN_TAB && it.tabId == "t2" })
+        assertTrue(suggestions.any { it.source == SuggestionSource.WEB_SEARCH })
+
+        val domainSuggestions = OmniboxSuggestionEngine.buildSuggestions(
+            query = "example.org",
+            history = history,
+            bookmarks = bookmarks,
+            savedPwas = pwas,
+            tabs = tabs
+        )
+        assertEquals(SuggestionSource.URL_DIRECT, domainSuggestions.first().source)
+        assertEquals("https://example.org", domainSuggestions.first().url)
+    }
+
+    @Test
+    fun `start page toggle and custom home url control home and new tab navigation`() = runTest {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        viewModel.setStartPageEnabled(false)
+        viewModel.setCustomHomeUrl("wikipedia.org")
+        assertFalse(viewModel.uiState.value.settings.startPageEnabled)
+        assertEquals("https://wikipedia.org", viewModel.uiState.value.settings.customHomeUrl)
+
+        viewModel.goHome()
+        assertEquals("https://wikipedia.org", viewModel.uiState.value.activeTab!!.url)
+
+        viewModel.openNewTab()
+        assertEquals("https://wikipedia.org", viewModel.uiState.value.activeTab!!.url)
+    }
+
+    @Test
+    fun `startup restores last visited non-incognito tabs when restoreLastPageOnStartup is true`() = runTest {
+        val saved = PersistedSessionState(
+            tabs = listOf(
+                PersistedTabSnapshot(url = "https://github.com", title = "GitHub"),
+                PersistedTabSnapshot(url = "https://developer.android.com", title = "Android")
+            ),
+            activeIndex = 1
+        )
+        val storeWithSession = FakePersistentSettingsStore(
+            initialSettings = BrowserSettings(restoreLastPageOnStartup = true),
+            initialSession = saved
+        )
+        val restoredVm = BrowserViewModel(
+            bookmarkRepository = repository,
+            settingsStore = storeWithSession,
+            newsFeedSource = fakeNews,
+            webAnalyzer = fakeAnalyzer
+        )
+        backgroundScope.launch(testDispatcher) { restoredVm.uiState.collect {} }
+
+        val state = restoredVm.uiState.value
+        assertEquals(2, state.tabs.size)
+        assertEquals("https://developer.android.com", state.activeTab!!.url)
+        assertEquals("Android", state.activeTab!!.title)
+
+        // Clear all browsing data clears both history and persisted session
+        restoredVm.clearAllBrowsingData("Cleared")
+        assertNull(storeWithSession.sessionFlow.value)
+    }
+
+    @Test
+    fun `incognito tab does not overwrite saved non-incognito session and external intent is not clobbered`() = runTest {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        val baseId = viewModel.uiState.value.activeTabId
+        viewModel.navigateTo("https://github.com")
+        assertEquals("https://github.com", settingsStore.sessionFlow.value?.tabs?.first()?.url)
+
+        viewModel.openNewTab("https://private.example.com", isIncognito = true)
+        val incogSessionTabs = settingsStore.sessionFlow.value?.tabs.orEmpty()
+        assertTrue(incogSessionTabs.none { it.url == "https://private.example.com" })
+
+        val incogTab = viewModel.uiState.value.activeTab!!
+        viewModel.closeTab(incogTab.id)
+        assertEquals(baseId, viewModel.uiState.value.activeTabId)
+    }
+
+    @Test
+    fun `ai unexpected throwable is safely captured in Error state without crashing`() = runTest {
+        val crashingAnalyzer = FakeWebAnalyzer(throwFatal = LinkageError("Simulated runtime linkage failure"))
+        val safeVm = BrowserViewModel(
+            bookmarkRepository = repository,
+            newsFeedSource = fakeNews,
+            webAnalyzer = crashingAnalyzer
+        )
+        backgroundScope.launch(testDispatcher) { safeVm.uiState.collect {} }
+
+        safeVm.openAiAnalystPage(autoRun = true)
+        val aiState = safeVm.uiState.value.aiAnalysisState
+        assertTrue(aiState is AiAnalysisUiState.Error)
+        assertTrue((aiState as AiAnalysisUiState.Error).message.contains("Simulated runtime linkage failure"))
     }
 
     @Test
@@ -159,20 +351,17 @@ class BrowserViewModelTest {
         assertTrue(incognitoTab.isIncognito)
         assertEquals("Incognito", incognitoTab.title)
 
-        // Lock incognito tab and verify closeTab refuses to close while locked
         viewModel.toggleTabLock(incognitoTab.id)
         assertTrue(viewModel.uiState.value.activeTab!!.isLocked)
         viewModel.closeTab(incognitoTab.id)
         assertEquals(2, viewModel.uiState.value.tabs.size)
         assertTrue(viewModel.uiState.value.statusMessage?.contains("locked", ignoreCase = true) == true)
 
-        // Assign group & filter
         viewModel.assignTabGroup(incognitoTab.id, "Research", 0xFF34D399L)
         assertEquals("Research", viewModel.uiState.value.activeTab!!.groupName)
         viewModel.selectGroupFilter("Research")
         assertEquals("Research", viewModel.uiState.value.activeGroupFilter)
 
-        // Unlock and close
         viewModel.toggleTabLock(incognitoTab.id)
         viewModel.closeTab(incognitoTab.id)
         assertEquals(1, viewModel.uiState.value.tabs.size)
@@ -183,26 +372,22 @@ class BrowserViewModelTest {
     fun `ai web analyzing defaults enabled, toggles off, and saves result to notes`() = runTest {
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
 
-        // Enabled by default
         assertTrue(viewModel.uiState.value.settings.aiWebAnalyzingEnabled)
         viewModel.openAiAnalystPage(autoRun = true)
         assertEquals(ActiveToolPage.AI_ANALYST, viewModel.uiState.value.activeToolPage)
         assertEquals(1, fakeAnalyzer.callCount)
         assertTrue(viewModel.uiState.value.aiAnalysisState is AiAnalysisUiState.Success)
 
-        // Save AI analysis into Notes & Clips
         viewModel.saveAiResultToNotes()
         assertEquals(1, viewModel.uiState.value.noteClips.size)
         assertTrue(viewModel.uiState.value.noteClips.first().title.startsWith("AI Brief:"))
 
-        // Disable AI Web Analysing in settings -> running analysis shows clear disabled message
         viewModel.setAiWebAnalyzingEnabled(false)
         assertFalse(viewModel.uiState.value.settings.aiWebAnalyzingEnabled)
         viewModel.analyzeActivePage(AiAnalysisMode.KEY_POINTS)
         assertEquals(1, fakeAnalyzer.callCount)
         assertTrue(viewModel.uiState.value.aiAnalysisState is AiAnalysisUiState.Error)
 
-        // Re-enable atomically via enableAiAndAnalyze
         viewModel.enableAiAndAnalyze(AiAnalysisMode.EXPLAIN_SIMPLE)
         assertTrue(viewModel.uiState.value.settings.aiWebAnalyzingEnabled)
         assertEquals(2, fakeAnalyzer.callCount)
@@ -235,13 +420,12 @@ class BrowserViewModelTest {
         viewModel.deletePasswordCredential(passId)
         assertTrue(viewModel.uiState.value.passwords.isEmpty())
 
-        viewModel.saveNoteClip("Architecture Note", "Verify Room v3 migration", "https://developer.android.com")
+        viewModel.saveNoteClip("Architecture Note", "Verify Room v4 migration", "https://developer.android.com")
         assertEquals(1, viewModel.uiState.value.noteClips.size)
         val noteId = viewModel.uiState.value.noteClips.first().id
         viewModel.deleteNoteClip(noteId)
         assertTrue(viewModel.uiState.value.noteClips.isEmpty())
 
-        // Tour guide stepping and completion
         viewModel.startTourGuide()
         assertEquals(0, viewModel.uiState.value.tourStepIndex)
         viewModel.nextTourStep()
@@ -392,8 +576,13 @@ class BrowserViewModelTest {
 
         viewModel.openBookmarksSheet()
         assertTrue(viewModel.uiState.value.isBookmarksSheetOpen)
+        assertFalse(viewModel.uiState.value.isHistorySheetOpen)
         assertFalse(viewModel.uiState.value.isDownloadsSheetOpen)
         assertFalse(viewModel.uiState.value.isSettingsSheetOpen)
+
+        viewModel.openHistoryPage()
+        assertTrue(viewModel.uiState.value.isHistorySheetOpen)
+        assertFalse(viewModel.uiState.value.isBookmarksSheetOpen)
 
         viewModel.openSettingsSheet()
         assertTrue(viewModel.uiState.value.isSettingsSheetOpen)

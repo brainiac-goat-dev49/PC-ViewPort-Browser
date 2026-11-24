@@ -30,11 +30,15 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardHide
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VpnLock
@@ -64,12 +68,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.R
 import com.example.data.BrowserSettings
 import com.example.data.CityPreset
 import com.example.data.DesktopViewportPresets
 import com.example.data.MockLocationPresets
 import com.example.data.ProxyScheme
+import com.example.ui.AppUpdateUiState
 import kotlin.math.abs
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -95,6 +101,13 @@ fun SettingsPage(
     onToggleAiAnalyzing: (Boolean) -> Unit,
     onToggleTooltips: (Boolean) -> Unit,
     onToggleFloatingBubble: (Boolean) -> Unit,
+    onToggleStartPage: (Boolean) -> Unit,
+    onUpdateCustomHomeUrl: (String) -> Unit,
+    onToggleRestoreLastPage: (Boolean) -> Unit,
+    appUpdateState: AppUpdateUiState = AppUpdateUiState.Idle,
+    onToggleAutoCheckUpdates: (Boolean) -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    onOpenUpdateDialog: () -> Unit = {},
     onStartTourGuide: () -> Unit,
     onClearBrowsingData: () -> Unit,
     onOpenDevTools: () -> Unit,
@@ -112,6 +125,9 @@ fun SettingsPage(
     }
     var customLandscapeWidthInput by remember(settings.desktopLandscapeViewportWidthPx) {
         mutableStateOf(settings.desktopLandscapeViewportWidthPx.toString())
+    }
+    var customHomeInput by remember(settings.customHomeUrl) {
+        mutableStateOf(settings.customHomeUrl)
     }
     var latInput by remember(settings.mockLatitude) {
         mutableStateOf(settings.mockLatitude.toString())
@@ -708,6 +724,139 @@ fun SettingsPage(
                         }
                     }
 
+                    val startupCard: @Composable () -> Unit = {
+                        SettingsSectionCard(title = stringResource(R.string.settings_section_startup)) {
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.Home,
+                                title = stringResource(R.string.settings_start_page_enable),
+                                tip = stringResource(R.string.settings_start_page_tip),
+                                checked = settings.startPageEnabled,
+                                onCheckedChange = onToggleStartPage,
+                                testTag = "setting_start_page_switch"
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = customHomeInput,
+                                    onValueChange = { customHomeInput = it },
+                                    label = { Text(stringResource(R.string.settings_custom_home_label)) },
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("setting_custom_home_input")
+                                )
+                                Button(
+                                    onClick = { onUpdateCustomHomeUrl(customHomeInput) },
+                                    enabled = customHomeInput.isNotBlank(),
+                                    modifier = Modifier.testTag("setting_custom_home_apply")
+                                ) {
+                                    Text(stringResource(R.string.action_apply))
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.Restore,
+                                title = stringResource(R.string.settings_restore_last_page),
+                                tip = stringResource(R.string.settings_restore_last_page_tip),
+                                checked = settings.restoreLastPageOnStartup,
+                                onCheckedChange = onToggleRestoreLastPage,
+                                testTag = "setting_restore_last_page_switch"
+                            )
+                        }
+                    }
+
+                    val updatesCard: @Composable () -> Unit = {
+                        SettingsSectionCard(title = stringResource(R.string.settings_section_updates)) {
+                            val statusText = when (appUpdateState) {
+                                is AppUpdateUiState.Idle -> "Installed version: v${BuildConfig.VERSION_NAME}"
+                                is AppUpdateUiState.Checking -> stringResource(R.string.settings_checking_updates)
+                                is AppUpdateUiState.UpToDate -> stringResource(
+                                    R.string.update_up_to_date,
+                                    appUpdateState.localVersion
+                                )
+                                is AppUpdateUiState.Available -> stringResource(
+                                    R.string.update_dialog_title,
+                                    appUpdateState.release.versionName
+                                )
+                                is AppUpdateUiState.Downloading -> stringResource(
+                                    R.string.update_downloading_progress,
+                                    appUpdateState.progressPercent
+                                )
+                                is AppUpdateUiState.ReadyToInstall -> "APK ready to install (v${appUpdateState.release.versionName})"
+                                is AppUpdateUiState.Error -> appUpdateState.message
+                            }
+
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.SystemUpdate,
+                                title = stringResource(R.string.settings_auto_update_check),
+                                tip = stringResource(R.string.settings_auto_update_check_tip),
+                                checked = settings.autoCheckUpdatesOnStartup,
+                                onCheckedChange = onToggleAutoCheckUpdates,
+                                testTag = "setting_auto_update_switch"
+                            )
+
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (appUpdateState is AppUpdateUiState.Error) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.testTag("setting_update_status_text")
+                            )
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                FilledTonalButton(
+                                    onClick = onCheckForUpdates,
+                                    enabled = appUpdateState !is AppUpdateUiState.Checking &&
+                                        appUpdateState !is AppUpdateUiState.Downloading,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("setting_check_updates_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (appUpdateState is AppUpdateUiState.Checking) {
+                                            stringResource(R.string.settings_checking_updates)
+                                        } else {
+                                            stringResource(R.string.settings_check_updates_button)
+                                        }
+                                    )
+                                }
+
+                                if (appUpdateState is AppUpdateUiState.Available ||
+                                    appUpdateState is AppUpdateUiState.Downloading ||
+                                    appUpdateState is AppUpdateUiState.ReadyToInstall ||
+                                    (appUpdateState is AppUpdateUiState.Error && appUpdateState.release != null)
+                                ) {
+                                    Button(
+                                        onClick = onOpenUpdateDialog,
+                                        modifier = Modifier.testTag("setting_open_update_dialog_button")
+                                    ) {
+                                        Text(stringResource(R.string.update_dialog_update_now))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (useTwoColumns) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -718,6 +867,7 @@ fun SettingsPage(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 viewportCard()
+                                startupCard()
                                 productivityCard()
                                 privacyCard()
                             }
@@ -728,6 +878,7 @@ fun SettingsPage(
                                 locationCard()
                                 networkCard()
                                 engineCard()
+                                updatesCard()
                             }
                         }
                     } else {
@@ -736,11 +887,13 @@ fun SettingsPage(
                             modifier = containerModifier
                         ) {
                             viewportCard()
+                            startupCard()
                             productivityCard()
                             privacyCard()
                             locationCard()
                             networkCard()
                             engineCard()
+                            updatesCard()
                         }
                     }
 

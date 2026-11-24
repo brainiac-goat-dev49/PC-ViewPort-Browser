@@ -33,6 +33,16 @@ class MainActivity : ComponentActivity() {
         handleLaunchIntent(intent)
     }
 
+    override fun onPause() {
+        super.onPause()
+        browserViewModel.persistSessionState()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        browserViewModel.persistSessionState()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -43,6 +53,7 @@ class MainActivity : ComponentActivity() {
         if (intent == null) return
         when (intent.action) {
             BrowserLaunchContract.ACTION_NEW_INCOGNITO -> {
+                browserViewModel.markExternalNavigation()
                 browserViewModel.openNewTab(isIncognito = true)
             }
             BrowserLaunchContract.ACTION_AI_ANALYZE -> {
@@ -54,12 +65,14 @@ class MainActivity : ComponentActivity() {
             BrowserLaunchContract.ACTION_OPEN_PWA -> {
                 val url = intent.getStringExtra(BrowserLaunchContract.EXTRA_URL)
                 if (!url.isNullOrBlank()) {
+                    browserViewModel.markExternalNavigation()
                     browserViewModel.openNewTab(url = url, select = true)
                 }
             }
             Intent.ACTION_VIEW -> {
                 val dataUrl = intent.dataString
                 if (!dataUrl.isNullOrBlank()) {
+                    browserViewModel.markExternalNavigation()
                     browserViewModel.openNewTab(url = dataUrl, select = true)
                 }
             }
