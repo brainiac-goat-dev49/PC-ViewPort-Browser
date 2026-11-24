@@ -40,6 +40,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.browser.WebViewRegistry
 import com.example.system.ScreenshotStorageHelper
 import com.example.ui.components.AiAnalystPage
 import com.example.ui.components.BookmarkEditDialog
@@ -224,7 +225,12 @@ fun BrowserScreen(
     val baseDensity = LocalDensity.current
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val effectiveScale = if (maxWidth < 720.dp) {
+        val isLandscape = maxWidth > maxHeight
+        val activeDesktopWidthPx = WebViewRegistry.resolveDesktopWidthPx(
+            isLandscape = isLandscape,
+            settings = uiState.settings
+        )
+        val effectiveScale = if (minOf(maxWidth, maxHeight) < 600.dp) {
             uiState.settings.desktopUiScale.coerceIn(0.45f, 1.0f)
         } else {
             1.0f
@@ -267,7 +273,7 @@ fun BrowserScreen(
                             bookmarkCount = uiState.bookmarks.size,
                             adBlockerEnabled = uiState.settings.adBlockerEnabled,
                             blockedAdsCount = uiState.totalBlockedAds,
-                            desktopViewportWidthPx = uiState.settings.desktopViewportWidthPx,
+                            desktopViewportWidthPx = activeDesktopWidthPx,
                             isDevToolsOpen = uiState.isDevToolsOpen,
                             disableSoftKeyboard = uiState.settings.disableSoftKeyboard,
                             aiWebAnalyzingEnabled = uiState.settings.aiWebAnalyzingEnabled,
@@ -354,6 +360,7 @@ fun BrowserScreen(
                             isSystemVpnActive = uiState.isSystemVpnActive,
                             onBack = viewModel::closeActiveToolPage,
                             onSelectDesktopWidthPx = viewModel::setDesktopViewportWidthPx,
+                            onSelectDesktopLandscapeWidthPx = viewModel::setDesktopLandscapeViewportWidthPx,
                             onSelectDesktopUiScale = viewModel::setDesktopUiScale,
                             onToggleAdBlocker = viewModel::setAdBlockerEnabled,
                             onToggleMockLocation = viewModel::setMockLocationEnabled,

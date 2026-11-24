@@ -96,8 +96,9 @@
     <string name="settings_js_enabled_tip">Controls JavaScript execution across all browser tabs.</string>
     <string name="settings_open_devtools">Open DevTools Console Drawer</string>
     <string name="settings_section_viewport">Desktop Viewport &amp; UI Scale</string>
-    <string name="settings_desktop_width">Website Desktop Width (px)</string>
-    <string name="settings_desktop_width_tip">Forces all websites to render at this desktop px width and scales them to fit your exact device resolution.</string>
+    <string name="settings_desktop_width">Portrait Desktop Width (px)</string>
+    <string name="settings_desktop_width_tip">Forces websites to render at distinct desktop px widths in Portrait vs Landscape and scales them to fit your screen.</string>
+    <string name="settings_desktop_landscape_width">Landscape Desktop Width (px)</string>
     <string name="settings_ui_scale">App Chrome &amp; Tools Scale</string>
     <string name="settings_ui_scale_tip">Scales the browser tabs, toolbar, and tools to match a real desktop workspace.</string>
 

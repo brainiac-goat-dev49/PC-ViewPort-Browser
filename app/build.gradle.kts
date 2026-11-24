@@ -24,7 +24,7 @@ android {
     val ciVersionName = providers.environmentVariable("VERSION_NAME").orNull
       ?.takeIf { it.isNotBlank() }
       ?: providers.gradleProperty("VERSION_NAME").orNull?.takeIf { it.isNotBlank() }
-      ?: if (safeVersionCode == 1) "1.0.0" else "1.0.$safeVersionCode"
+      ?: "1.0.0"
 
     versionCode = safeVersionCode
     versionName = ciVersionName

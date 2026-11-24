@@ -26,6 +26,7 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
 
     private object Keys {
         val DESKTOP_WIDTH_PX = intPreferencesKey("desktop_viewport_width_px")
+        val DESKTOP_LANDSCAPE_WIDTH_PX = intPreferencesKey("desktop_landscape_viewport_width_px")
         val DESKTOP_UI_SCALE = floatPreferencesKey("desktop_ui_scale")
         val AD_BLOCKER = booleanPreferencesKey("ad_blocker_enabled")
         val MOCK_LOCATION = booleanPreferencesKey("mock_location_enabled")
@@ -54,6 +55,7 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
             val current = readFromPrefs(prefs)
             val next = transform(current)
             prefs[Keys.DESKTOP_WIDTH_PX] = next.desktopViewportWidthPx
+            prefs[Keys.DESKTOP_LANDSCAPE_WIDTH_PX] = next.desktopLandscapeViewportWidthPx
             prefs[Keys.DESKTOP_UI_SCALE] = next.desktopUiScale
             prefs[Keys.AD_BLOCKER] = next.adBlockerEnabled
             prefs[Keys.MOCK_LOCATION] = next.mockLocationEnabled
@@ -79,6 +81,7 @@ class BrowserSettingsRepository(private val context: Context) : SettingsStore {
         val scheme = runCatching { ProxyScheme.valueOf(schemeName) }.getOrDefault(ProxyScheme.HTTP)
         return BrowserSettings(
             desktopViewportWidthPx = prefs[Keys.DESKTOP_WIDTH_PX] ?: 1280,
+            desktopLandscapeViewportWidthPx = prefs[Keys.DESKTOP_LANDSCAPE_WIDTH_PX] ?: 1920,
             desktopUiScale = prefs[Keys.DESKTOP_UI_SCALE] ?: 0.56f,
             adBlockerEnabled = prefs[Keys.AD_BLOCKER] ?: true,
             mockLocationEnabled = prefs[Keys.MOCK_LOCATION] ?: false,

@@ -1066,6 +1066,12 @@ class BrowserViewModel(
         }
     }
 
+    fun setDesktopLandscapeViewportWidthPx(widthPx: Int) {
+        updateSettings(reloadActive = true) {
+            it.copy(desktopLandscapeViewportWidthPx = widthPx.coerceIn(640, 3840))
+        }
+    }
+
     fun setDesktopUiScale(scale: Float) {
         updateSettings(reloadActive = false) {
             it.copy(desktopUiScale = scale.coerceIn(0.45f, 1.0f))

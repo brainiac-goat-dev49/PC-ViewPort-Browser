@@ -21,7 +21,7 @@ object MockLocationPresets {
 }
 
 object DesktopViewportPresets {
-    val widthsPx = listOf(1024, 1280, 1440, 1920, 2560)
+    val widthsPx = listOf(1024, 1280, 1440, 1600, 1920, 2560)
     val uiScales = listOf(
         0.52f to "0.52x Ultra",
         0.56f to "0.56x PC",
@@ -32,6 +32,7 @@ object DesktopViewportPresets {
 
 data class BrowserSettings(
     val desktopViewportWidthPx: Int = 1280,
+    val desktopLandscapeViewportWidthPx: Int = 1920,
     val desktopUiScale: Float = 0.56f,
     val adBlockerEnabled: Boolean = true,
     val mockLocationEnabled: Boolean = false,

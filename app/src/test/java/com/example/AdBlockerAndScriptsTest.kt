@@ -2,6 +2,9 @@ package com.example
 
 import com.example.browser.AdBlocker
 import com.example.browser.BrowserScripts
+import com.example.browser.WebViewRegistry
+import com.example.data.BrowserSettings
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,5 +130,22 @@ class AdBlockerAndScriptsTest {
         assertTrue(BrowserScripts.EXTRACT_MEDIA_SCRIPT.contains("audio, audio source"))
         assertTrue(BrowserScripts.EXTRACT_MEDIA_SCRIPT.contains("img"))
         assertTrue(BrowserScripts.EXTRACT_PWA_MANIFEST_SCRIPT.contains("link[rel=\"manifest\"]"))
+    }
+
+    @Test
+    fun `desktop viewport width varies between portrait and landscape orientations`() {
+        val defaults = BrowserSettings()
+        assertFalse(WebViewRegistry.isLandscapeViewport(412f, 820f))
+        assertTrue(WebViewRegistry.isLandscapeViewport(820f, 340f))
+
+        assertEquals(1280, WebViewRegistry.resolveDesktopWidthPx(isLandscape = false, settings = defaults))
+        assertEquals(1920, WebViewRegistry.resolveDesktopWidthPx(isLandscape = true, settings = defaults))
+
+        val custom = BrowserSettings(
+            desktopViewportWidthPx = 400,
+            desktopLandscapeViewportWidthPx = 4200
+        )
+        assertEquals(640, WebViewRegistry.resolveDesktopWidthPx(isLandscape = false, settings = custom))
+        assertEquals(3840, WebViewRegistry.resolveDesktopWidthPx(isLandscape = true, settings = custom))
     }
 }

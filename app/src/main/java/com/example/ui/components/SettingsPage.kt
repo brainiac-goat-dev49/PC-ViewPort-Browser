@@ -80,6 +80,7 @@ fun SettingsPage(
     isSystemVpnActive: Boolean,
     onBack: () -> Unit,
     onSelectDesktopWidthPx: (Int) -> Unit,
+    onSelectDesktopLandscapeWidthPx: (Int) -> Unit,
     onSelectDesktopUiScale: (Float) -> Unit,
     onToggleAdBlocker: (Boolean) -> Unit,
     onToggleMockLocation: (Boolean) -> Unit,
@@ -101,11 +102,16 @@ fun SettingsPage(
 ) {
     val context = LocalContext.current
     val displayMetrics = context.resources.displayMetrics
-    val nativeWidthPx = displayMetrics.widthPixels.coerceIn(640, 3840)
+    val isCurrentlyLandscape = displayMetrics.widthPixels > displayMetrics.heightPixels
+    val portraitNativePx = minOf(displayMetrics.widthPixels, displayMetrics.heightPixels).coerceIn(640, 3840)
+    val landscapeNativePx = maxOf(displayMetrics.widthPixels, displayMetrics.heightPixels).coerceIn(640, 3840)
     val nativeHeightPx = displayMetrics.heightPixels
 
     var customWidthInput by remember(settings.desktopViewportWidthPx) {
         mutableStateOf(settings.desktopViewportWidthPx.toString())
+    }
+    var customLandscapeWidthInput by remember(settings.desktopLandscapeViewportWidthPx) {
+        mutableStateOf(settings.desktopLandscapeViewportWidthPx.toString())
     }
     var latInput by remember(settings.mockLatitude) {
         mutableStateOf(settings.mockLatitude.toString())
@@ -223,12 +229,12 @@ fun SettingsPage(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             FilterChip(
-                                selected = settings.desktopViewportWidthPx == nativeWidthPx,
+                                selected = settings.desktopViewportWidthPx == portraitNativePx,
                                 onClick = {
-                                    customWidthInput = nativeWidthPx.toString()
-                                    onSelectDesktopWidthPx(nativeWidthPx)
+                                    customWidthInput = portraitNativePx.toString()
+                                    onSelectDesktopWidthPx(portraitNativePx)
                                 },
-                                label = { Text("Device (${nativeWidthPx}px)") },
+                                label = { Text("Device (${portraitNativePx}px)") },
                                 modifier = Modifier.testTag("desktop_width_native")
                             )
                             DesktopViewportPresets.widthsPx.forEach { widthPx ->
@@ -252,9 +258,14 @@ fun SettingsPage(
                             OutlinedTextField(
                                 value = customWidthInput,
                                 onValueChange = { customWidthInput = it.filter(Char::isDigit) },
-                                label = { Text("Custom Width (px)") },
+                                label = { Text("Portrait Custom Width (px)") },
                                 supportingText = {
-                                    Text("Screen: ${displayMetrics.widthPixels}x${nativeHeightPx}px • Forced: ${settings.desktopViewportWidthPx}px")
+                                    val activeLabel = if (isCurrentlyLandscape) {
+                                        "Active: Landscape ${settings.desktopLandscapeViewportWidthPx}px"
+                                    } else {
+                                        "Active: Portrait ${settings.desktopViewportWidthPx}px"
+                                    }
+                                    Text("Screen: ${displayMetrics.widthPixels}x${nativeHeightPx}px • $activeLabel")
                                 },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -267,6 +278,67 @@ fun SettingsPage(
                                     customWidthInput.toIntOrNull()?.let(onSelectDesktopWidthPx)
                                 },
                                 modifier = Modifier.testTag("desktop_width_custom_apply")
+                            ) {
+                                Text(stringResource(R.string.action_apply))
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                        Text(
+                            text = stringResource(R.string.settings_desktop_landscape_width),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            FilterChip(
+                                selected = settings.desktopLandscapeViewportWidthPx == landscapeNativePx,
+                                onClick = {
+                                    customLandscapeWidthInput = landscapeNativePx.toString()
+                                    onSelectDesktopLandscapeWidthPx(landscapeNativePx)
+                                },
+                                label = { Text("Device (${landscapeNativePx}px)") },
+                                modifier = Modifier.testTag("desktop_landscape_width_native")
+                            )
+                            DesktopViewportPresets.widthsPx.forEach { widthPx ->
+                                FilterChip(
+                                    selected = settings.desktopLandscapeViewportWidthPx == widthPx,
+                                    onClick = {
+                                        customLandscapeWidthInput = widthPx.toString()
+                                        onSelectDesktopLandscapeWidthPx(widthPx)
+                                    },
+                                    label = { Text("${widthPx}px") },
+                                    modifier = Modifier.testTag("desktop_landscape_width_$widthPx")
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = customLandscapeWidthInput,
+                                onValueChange = { customLandscapeWidthInput = it.filter(Char::isDigit) },
+                                label = { Text("Landscape Custom Width (px)") },
+                                supportingText = {
+                                    Text("Forced in landscape: ${settings.desktopLandscapeViewportWidthPx}px")
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("desktop_landscape_width_custom_input")
+                            )
+                            Button(
+                                onClick = {
+                                    customLandscapeWidthInput.toIntOrNull()?.let(onSelectDesktopLandscapeWidthPx)
+                                },
+                                modifier = Modifier.testTag("desktop_landscape_width_custom_apply")
                             ) {
                                 Text(stringResource(R.string.action_apply))
                             }

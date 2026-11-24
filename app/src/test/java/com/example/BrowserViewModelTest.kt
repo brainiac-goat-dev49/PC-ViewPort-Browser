@@ -358,6 +358,9 @@ class BrowserViewModelTest {
     fun `desktop viewport width and ui scale update and clamp safely`() = runTest {
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
 
+        assertEquals(1280, viewModel.uiState.value.settings.desktopViewportWidthPx)
+        assertEquals(1920, viewModel.uiState.value.settings.desktopLandscapeViewportWidthPx)
+
         viewModel.setDesktopViewportWidthPx(1440)
         assertEquals(1440, viewModel.uiState.value.settings.desktopViewportWidthPx)
 
@@ -366,6 +369,15 @@ class BrowserViewModelTest {
 
         viewModel.setDesktopViewportWidthPx(300)
         assertEquals(640, viewModel.uiState.value.settings.desktopViewportWidthPx)
+
+        viewModel.setDesktopLandscapeViewportWidthPx(1600)
+        assertEquals(1600, viewModel.uiState.value.settings.desktopLandscapeViewportWidthPx)
+
+        viewModel.setDesktopLandscapeViewportWidthPx(5000)
+        assertEquals(3840, viewModel.uiState.value.settings.desktopLandscapeViewportWidthPx)
+
+        viewModel.setDesktopLandscapeViewportWidthPx(200)
+        assertEquals(640, viewModel.uiState.value.settings.desktopLandscapeViewportWidthPx)
 
         viewModel.setDesktopUiScale(0.72f)
         assertEquals(0.72f, viewModel.uiState.value.settings.desktopUiScale, 0.001f)

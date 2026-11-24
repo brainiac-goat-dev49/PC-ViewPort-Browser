@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.MutableContextWrapper
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
@@ -84,14 +85,15 @@ class WebViewRegistry {
             webViews.forEach { (tabId, webView) ->
                 val isDesktop = tabDesktopModes[tabId] ?: true
                 if (isDesktop) {
-                    val fitScale = computeFitScale(webView.context, currentSettings.desktopViewportWidthPx)
-                    val desktopH = computeDesktopHeightPx(webView.context, currentSettings.desktopViewportWidthPx)
+                    val targetWidthPx = effectiveDesktopWidthPx(webView.context, currentSettings)
+                    val fitScale = computeFitScale(webView.context, targetWidthPx)
+                    val desktopH = computeDesktopHeightPx(webView.context, targetWidthPx)
                     webView.setInitialScale((fitScale * 100).toInt().coerceIn(15, 100))
                     syncDocumentStartViewportScript(tabId, webView, true)
                     if (currentSettings.javaScriptEnabled) {
                         webView.evaluateJavascript(
                             BrowserScripts.buildDesktopViewportScript(
-                                currentSettings.desktopViewportWidthPx,
+                                targetWidthPx,
                                 fitScale,
                                 desktopH
                             ),
@@ -101,6 +103,14 @@ class WebViewRegistry {
                 }
             }
         }
+    }
+
+    private fun effectiveDesktopWidthPx(
+        context: Context,
+        settings: BrowserSettings = currentSettings
+    ): Int {
+        val isLandscape = isLandscapeViewport(viewportWidthDp, viewportHeightDp, context)
+        return resolveDesktopWidthPx(isLandscape, settings)
     }
 
     private fun computeFitScale(context: Context, desktopWidthPx: Int): Float {
@@ -114,7 +124,7 @@ class WebViewRegistry {
         val density = metrics.density.coerceAtLeast(1f)
         val containerW = viewportWidthDp ?: (metrics.widthPixels / density)
         val containerH = viewportHeightDp ?: (metrics.heightPixels / density)
-        val aspect = (containerH / containerW.coerceAtLeast(1f)).coerceIn(0.4f, 3.0f)
+        val aspect = (containerH / containerW.coerceAtLeast(1f)).coerceIn(0.25f, 3.0f)
         return (desktopWidthPx * aspect).toInt().coerceIn(480, 6000)
     }
 
@@ -122,10 +132,11 @@ class WebViewRegistry {
         documentStartHandlers.remove(tabId)?.remove()
         if (!isDesktopMode) return
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            val fitScale = computeFitScale(webView.context, currentSettings.desktopViewportWidthPx)
-            val desktopH = computeDesktopHeightPx(webView.context, currentSettings.desktopViewportWidthPx)
+            val targetWidthPx = effectiveDesktopWidthPx(webView.context, currentSettings)
+            val fitScale = computeFitScale(webView.context, targetWidthPx)
+            val desktopH = computeDesktopHeightPx(webView.context, targetWidthPx)
             val script = BrowserScripts.buildDesktopViewportScript(
-                currentSettings.desktopViewportWidthPx,
+                targetWidthPx,
                 fitScale,
                 desktopH
             )
@@ -168,7 +179,8 @@ class WebViewRegistry {
             configureSettings(settings, isDesktopMode, currentSettings, isIncognito)
             applySettingsToWebView(this, settings, isDesktopMode, currentSettings, isIncognito)
             if (isDesktopMode) {
-                val fitScale = computeFitScale(context, currentSettings.desktopViewportWidthPx)
+                val targetWidthPx = effectiveDesktopWidthPx(context, currentSettings)
+                val fitScale = computeFitScale(context, targetWidthPx)
                 setInitialScale((fitScale * 100).toInt().coerceIn(15, 100))
             } else {
                 setInitialScale(0)
@@ -229,11 +241,12 @@ class WebViewRegistry {
                     val desktopActive = tabDesktopModes[tabId] ?: true
                     if (activeSettings.javaScriptEnabled && view != null) {
                         if (desktopActive) {
-                            val fitScale = computeFitScale(view.context, activeSettings.desktopViewportWidthPx)
-                            val desktopH = computeDesktopHeightPx(view.context, activeSettings.desktopViewportWidthPx)
+                            val targetWidthPx = effectiveDesktopWidthPx(view.context, activeSettings)
+                            val fitScale = computeFitScale(view.context, targetWidthPx)
+                            val desktopH = computeDesktopHeightPx(view.context, targetWidthPx)
                             view.evaluateJavascript(
                                 BrowserScripts.buildDesktopViewportScript(
-                                    activeSettings.desktopViewportWidthPx,
+                                    targetWidthPx,
                                     fitScale,
                                     desktopH
                                 ),
@@ -258,11 +271,12 @@ class WebViewRegistry {
                     val desktopActive = tabDesktopModes[tabId] ?: true
                     if (activeSettings.javaScriptEnabled && view != null) {
                         if (desktopActive) {
-                            val fitScale = computeFitScale(view.context, activeSettings.desktopViewportWidthPx)
-                            val desktopH = computeDesktopHeightPx(view.context, activeSettings.desktopViewportWidthPx)
+                            val targetWidthPx = effectiveDesktopWidthPx(view.context, activeSettings)
+                            val fitScale = computeFitScale(view.context, targetWidthPx)
+                            val desktopH = computeDesktopHeightPx(view.context, targetWidthPx)
                             view.evaluateJavascript(
                                 BrowserScripts.buildDesktopViewportScript(
-                                    activeSettings.desktopViewportWidthPx,
+                                    targetWidthPx,
                                     fitScale,
                                     desktopH
                                 ),
@@ -422,13 +436,14 @@ class WebViewRegistry {
             applySettingsToWebView(webView, webView.settings, isDesktop, settings, isIncognito)
             syncDocumentStartViewportScript(tabId, webView, isDesktop)
             if (isDesktop) {
-                val fitScale = computeFitScale(webView.context, settings.desktopViewportWidthPx)
-                val desktopH = computeDesktopHeightPx(webView.context, settings.desktopViewportWidthPx)
+                val targetWidthPx = effectiveDesktopWidthPx(webView.context, settings)
+                val fitScale = computeFitScale(webView.context, targetWidthPx)
+                val desktopH = computeDesktopHeightPx(webView.context, targetWidthPx)
                 webView.setInitialScale((fitScale * 100).toInt().coerceIn(15, 100))
                 if (settings.javaScriptEnabled) {
                     webView.evaluateJavascript(
                         BrowserScripts.buildDesktopViewportScript(
-                            settings.desktopViewportWidthPx,
+                            targetWidthPx,
                             fitScale,
                             desktopH
                         ),
@@ -542,7 +557,8 @@ class WebViewRegistry {
         configureViewportAndUserAgent(webView.settings, isDesktopMode)
         syncDocumentStartViewportScript(tabId, webView, isDesktopMode)
         if (isDesktopMode) {
-            val fitScale = computeFitScale(webView.context, currentSettings.desktopViewportWidthPx)
+            val targetWidthPx = effectiveDesktopWidthPx(webView.context, currentSettings)
+            val fitScale = computeFitScale(webView.context, targetWidthPx)
             webView.setInitialScale((fitScale * 100).toInt().coerceIn(15, 100))
         } else {
             webView.setInitialScale(0)
@@ -613,6 +629,33 @@ class WebViewRegistry {
 
     companion object {
         private const val TAG = "WebViewRegistry"
+
+        fun isLandscapeViewport(
+            viewportWidthDp: Float?,
+            viewportHeightDp: Float?,
+            context: Context? = null
+        ): Boolean {
+            if (viewportWidthDp != null && viewportHeightDp != null &&
+                viewportWidthDp > 100f && viewportHeightDp > 100f
+            ) {
+                return viewportWidthDp > viewportHeightDp
+            }
+            val config = context?.resources?.configuration
+            if (config != null && config.orientation != Configuration.ORIENTATION_UNDEFINED) {
+                return config.orientation == Configuration.ORIENTATION_LANDSCAPE
+            }
+            val metrics = context?.resources?.displayMetrics
+            return metrics != null && metrics.widthPixels > metrics.heightPixels
+        }
+
+        fun resolveDesktopWidthPx(isLandscape: Boolean, settings: BrowserSettings): Int {
+            val raw = if (isLandscape) {
+                settings.desktopLandscapeViewportWidthPx
+            } else {
+                settings.desktopViewportWidthPx
+            }
+            return raw.coerceIn(640, 3840)
+        }
 
         @SuppressLint("SetJavaScriptEnabled")
         @Suppress("DEPRECATION")
