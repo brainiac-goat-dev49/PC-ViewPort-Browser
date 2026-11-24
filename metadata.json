@@ -1,0 +1,8 @@
+{
+  "name": "PC ViewPort Browser",
+  "description": "A native Android desktop web browser with multi-tab management, Windows 11 Chrome desktop viewport mode by default, smart omnibox search, and local bookmarks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

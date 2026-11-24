@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F172A"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:id="@+id/widget_search_area"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:background="#1E293B"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/app_name"
+            android:src="@mipmap/ic_launcher" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/widget_search_prompt"
+            android:textColor="#E2E8F0"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/widget_btn_incognito"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="6dp"
+        android:background="#1E293B"
+        android:contentDescription="@string/widget_incognito"
+        android:padding="10dp"
+        android:src="@android:drawable/ic_lock_lock"
+        android:tint="#C084FC" />
+
+    <ImageButton
+        android:id="@+id/widget_btn_ai"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="6dp"
+        android:background="#1E293B"
+        android:contentDescription="@string/widget_ai_analyst"
+        android:padding="10dp"
+        android:src="@android:drawable/ic_menu_search"
+        android:tint="#38BDF8" />
+
+    <ImageButton
+        android:id="@+id/widget_btn_news"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="6dp"
+        android:background="#1E293B"
+        android:contentDescription="@string/widget_daily_news"
+        android:padding="10dp"
+        android:src="@android:drawable/ic_menu_today"
+        android:tint="#34D399" />
+
+</LinearLayout>

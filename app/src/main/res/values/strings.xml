@@ -1,0 +1,179 @@
+<resources>
+    <string name="app_name">PC ViewPort</string>
+    <string name="cd_new_tab">Open new tab</string>
+    <string name="cd_close_tab">Close tab</string>
+    <string name="cd_nav_back">Navigate back</string>
+    <string name="cd_nav_forward">Navigate forward</string>
+    <string name="cd_nav_refresh">Refresh page</string>
+    <string name="cd_nav_stop">Stop loading</string>
+    <string name="cd_nav_home">Go to home page</string>
+    <string name="cd_toggle_user_agent">Toggle Desktop or Mobile mode</string>
+    <string name="cd_bookmark_toggle">Toggle bookmark for current page</string>
+    <string name="cd_bookmarks_manager">Open bookmarks manager</string>
+    <string name="cd_downloads_manager">Open downloads manager</string>
+    <string name="cd_devtools_console">Toggle DevTools Console</string>
+    <string name="cd_settings">Open Settings and DevTools</string>
+    <string name="cd_blocked_ads">Blocked ads counter</string>
+    <string name="cd_clear_omnibox">Clear address bar</string>
+    <string name="cd_site_security">Connection security info</string>
+    <string name="omnibox_placeholder">Search Google or enter web address</string>
+    <string name="mode_desktop_badge">PC</string>
+    <string name="mode_mobile_badge">Mobile</string>
+    <string name="mode_desktop_switched">Desktop mode enabled (Windows 11 Chrome)</string>
+    <string name="mode_mobile_switched">Mobile mode enabled</string>
+    <string name="new_tab_title">New Tab</string>
+    <string name="bookmarks_title">Bookmarks</string>
+    <string name="bookmarks_search_hint">Filter bookmarks…</string>
+    <string name="bookmarks_empty_title">No bookmarks saved yet</string>
+    <string name="bookmarks_empty_subtitle">Tap the star icon in the address bar to save any desktop page locally.</string>
+    <string name="bookmarks_add_current">Bookmark current page</string>
+    <string name="bookmarks_added">Bookmark saved</string>
+    <string name="bookmarks_removed">Bookmark removed</string>
+    <string name="bookmarks_open_new_tab">Open in new tab</string>
+    <string name="bookmarks_delete">Delete bookmark</string>
+    <string name="bookmarks_edit">Edit bookmark</string>
+    <string name="bookmark_dialog_title_edit">Edit Bookmark</string>
+    <string name="bookmark_dialog_title_add">Add Bookmark</string>
+    <string name="bookmark_field_title">Title</string>
+    <string name="bookmark_field_url">URL</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_apply">Apply</string>
+    <string name="action_clear">Clear</string>
+    <string name="tab_count_cd">Active tabs</string>
+
+    <!-- Downloads -->
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_empty_title">No downloads yet</string>
+    <string name="downloads_empty_subtitle">Files you download in PC ViewPort will appear here.</string>
+    <string name="download_started">Download started: %1$s</string>
+    <string name="download_failed">Unable to start download</string>
+    <string name="download_open">Open file</string>
+    <string name="download_delete">Remove entry</string>
+
+    <!-- DevTools Console -->
+    <string name="devtools_title">DevTools Console</string>
+    <string name="devtools_es_module">Run as ES Module</string>
+    <string name="devtools_es_module_tip">Wraps code in &lt;script type=\"module\"&gt; for native import and top-level await.</string>
+    <string name="devtools_run_script">Run Script</string>
+    <string name="devtools_input_hint">console.log(navigator.userAgent);</string>
+    <string name="devtools_empty">Console output from pages and scripts will stream here.</string>
+    <string name="devtools_clear">Clear console</string>
+
+    <!-- Settings & Power Tools -->
+    <string name="settings_title">Settings &amp; DevTools</string>
+    <string name="settings_section_privacy">Ad Blocker &amp; Privacy</string>
+    <string name="settings_ad_blocker">Ad &amp; Tracker Blocker</string>
+    <string name="settings_ad_blocker_tip">Intercepts requests to common ad, analytics, and tracker domains.</string>
+    <string name="settings_block_3p_cookies">Block Third-Party Cookies</string>
+    <string name="settings_block_3p_cookies_tip">Prevents cross-site tracking cookies inside WebView tabs.</string>
+    <string name="settings_clear_browsing_data">Clear Cache, Cookies &amp; Storage</string>
+    <string name="settings_data_cleared">Cache, cookies, and web storage cleared</string>
+
+    <string name="settings_section_location">Mock GPS Location</string>
+    <string name="settings_mock_location">Enable Mock Location</string>
+    <string name="settings_mock_location_tip">Overrides navigator.geolocation in web pages with custom coordinates.</string>
+    <string name="settings_latitude">Latitude</string>
+    <string name="settings_longitude">Longitude</string>
+
+    <string name="settings_section_network">Network &amp; VPN</string>
+    <string name="settings_vpn_active">System VPN: Active</string>
+    <string name="settings_vpn_inactive">System VPN: Not detected</string>
+    <string name="settings_proxy_enable">Custom WebView Proxy</string>
+    <string name="settings_proxy_tip">Routes WebView requests through an HTTP or SOCKS5 proxy via ProxyController.</string>
+    <string name="settings_proxy_host">Proxy Host (e.g. 127.0.0.1)</string>
+    <string name="settings_proxy_port">Port (e.g. 8080)</string>
+    <string name="settings_proxy_applied">Proxy configuration applied</string>
+    <string name="settings_proxy_cleared">Proxy override cleared</string>
+    <string name="settings_proxy_invalid">Enter a valid proxy host and port (1–65535)</string>
+
+    <string name="settings_section_engine">Engine &amp; Hardware Mode</string>
+    <string name="settings_hardware_keyboard">Disable Android Keyboard (Hardware/PC Mode)</string>
+    <string name="settings_hardware_keyboard_tip">Suppresses the on-screen IME in both UI fields and WebView for external keyboards.</string>
+    <string name="settings_force_dark">Force Dark Mode on Web Pages</string>
+    <string name="settings_force_dark_tip">Applies WebSettingsCompat dark rendering to websites without native dark themes.</string>
+    <string name="settings_js_enabled">Enable JavaScript</string>
+    <string name="settings_js_enabled_tip">Controls JavaScript execution across all browser tabs.</string>
+    <string name="settings_open_devtools">Open DevTools Console Drawer</string>
+    <string name="settings_section_viewport">Desktop Viewport &amp; UI Scale</string>
+    <string name="settings_desktop_width">Website Desktop Width (px)</string>
+    <string name="settings_desktop_width_tip">Forces all websites to render at this desktop px width and scales them to fit your exact device resolution.</string>
+    <string name="settings_ui_scale">App Chrome &amp; Tools Scale</string>
+    <string name="settings_ui_scale_tip">Scales the browser tabs, toolbar, and tools to match a real desktop workspace.</string>
+
+    <!-- AI Web Analysing & Productivity Settings -->
+    <string name="settings_section_productivity">AI, Tooltips &amp; Outside-App Tools</string>
+    <string name="settings_ai_analyzing">AI Web Analysing (Gemini)</string>
+    <string name="settings_ai_analyzing_tip">Enabled by default. Lets Gemini summarize, explain, and audit any active web page.</string>
+    <string name="settings_tooltips">Show Tooltips on Tools &amp; Controls</string>
+    <string name="settings_tooltips_tip">Displays helpful labels when hovering or long-pressing toolbar buttons and settings.</string>
+    <string name="settings_floating_bubble">Floating Bubble Outside App</string>
+    <string name="settings_floating_bubble_tip">Keeps a draggable quick-launch PC ViewPort bubble above other apps.</string>
+    <string name="settings_start_tour">Launch Interactive Tour Guide</string>
+
+    <!-- New Tools & Navigation -->
+    <string name="cd_incognito_tab">New incognito tab</string>
+    <string name="cd_ai_analyst">AI Web Analyst</string>
+    <string name="cd_quick_actions">Website Quick Actions &amp; Tools</string>
+    <string name="cd_tab_groups">Manage tab groups and locks</string>
+    <string name="incognito_badge">Incognito</string>
+    <string name="tab_locked_notice">Tab is locked. Unlock it from Tab Options before closing.</string>
+
+    <!-- AI Web Analyst Page -->
+    <string name="ai_analyst_title">AI Web Analyst</string>
+    <string name="ai_analyst_disabled">AI Web Analysing is currently turned off in Settings.</string>
+    <string name="ai_analyst_enable_action">Enable AI Analysis</string>
+    <string name="ai_analyst_analyze_button">Analyze Page</string>
+    <string name="ai_analyst_question_hint">Ask anything about this page (optional)…</string>
+    <string name="ai_analyst_save_clip">Save to Notes &amp; Clips</string>
+    <string name="ai_analyst_extracting">Reading desktop DOM &amp; headings…</string>
+    <string name="ai_analyst_thinking">Gemini 3.8 Flash is analyzing…</string>
+
+    <!-- Quick Actions Page -->
+    <string name="quick_actions_title">Website Quick Actions &amp; Tools</string>
+    <string name="quick_actions_pwa_install">Install Web App (PWA)</string>
+    <string name="quick_actions_find_in_page">Find in Page</string>
+    <string name="find_in_page_hint">Find text on page…</string>
+
+    <!-- Daily News Page -->
+    <string name="news_title">Daily News</string>
+    <string name="news_loading">Loading live headlines…</string>
+    <string name="news_open_tab">Open in Tab</string>
+    <string name="news_ai_analyze">AI Brief</string>
+
+    <!-- Password Manager -->
+    <string name="passwords_title">Password Manager</string>
+    <string name="passwords_search_hint">Search saved logins…</string>
+    <string name="passwords_empty">No saved credentials yet. Store site logins encrypted with Android Keystore.</string>
+    <string name="passwords_autofill">Autofill Active Tab</string>
+    <string name="passwords_generate">Generate</string>
+
+    <!-- Notes & Clips Manager -->
+    <string name="notes_title">Notes &amp; Clips</string>
+    <string name="notes_clip_page">Clip Selection / Page</string>
+    <string name="notes_empty">No notes or web clips saved yet.</string>
+    <string name="notes_search_hint">Search notes and clips…</string>
+
+    <!-- Media Downloader -->
+    <string name="media_title">Media Downloader</string>
+    <string name="media_rescan">Rescan Page</string>
+    <string name="media_empty">No downloadable media detected in this category yet. Play media or rescan.</string>
+
+    <!-- Screenshot & Editor / Image Viewer -->
+    <string name="screenshot_title">Screenshot &amp; Editor</string>
+    <string name="screenshot_save">Save to Gallery</string>
+    <string name="screenshot_share">Share</string>
+    <string name="screenshot_saved">Screenshot saved to Pictures/PCViewPort</string>
+    <string name="image_viewer_title">Image Viewer</string>
+
+    <!-- Widget & Bubble -->
+    <string name="widget_description">Quick launch PC ViewPort Desktop Browser, Incognito, AI Analyst, and Daily News.</string>
+    <string name="widget_search_prompt">Search or browse in PC ViewPort…</string>
+    <string name="widget_incognito">Incognito Tab</string>
+    <string name="widget_ai_analyst">AI Web Analyst</string>
+    <string name="widget_daily_news">Daily News</string>
+    <string name="bubble_channel_name">Floating Browser Bubble</string>
+    <string name="bubble_notification_title">PC ViewPort Floating Bubble</string>
+    <string name="bubble_notification_text">Tap the floating bubble for quick desktop browser actions.</string>
+    <string name="bubble_stop_action">Hide Bubble</string>
+</resources>
