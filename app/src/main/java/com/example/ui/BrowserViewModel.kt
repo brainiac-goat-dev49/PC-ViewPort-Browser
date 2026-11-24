@@ -441,7 +441,10 @@ class BrowserViewModel(
                         )
                     }
                 }
-                if (initialSettings.autoCheckUpdatesOnStartup && appUpdateChecker != null) {
+                val isRobolectric = runCatching {
+                    android.os.Build.FINGERPRINT.equals("robolectric", ignoreCase = true)
+                }.getOrDefault(false)
+                if (!isRobolectric && initialSettings.autoCheckUpdatesOnStartup && appUpdateChecker != null) {
                     checkForUpdates(userInitiated = false)
                 }
             }
